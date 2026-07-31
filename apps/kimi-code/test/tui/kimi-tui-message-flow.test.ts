@@ -5237,7 +5237,7 @@ command = "vim"
         () => {},
       );
 
-      expect(setTitle).toHaveBeenCalledWith('Implement terminal title');
+      expect(setTitle).toHaveBeenCalledWith('Implement terminal title · ses-1');
       expect(process.title).toBe('kimi-test-runner');
     } finally {
       process.title = originalTitle;
@@ -5269,7 +5269,7 @@ command = "vim"
         });
         expect(driver.getCurrentSessionId()).toBe('ses-fork');
       });
-      expect(setTitle).toHaveBeenCalledWith('Fork: Source title');
+      expect(setTitle).toHaveBeenCalledWith('Fork: Source title · ses-fork');
       expect(process.title).toBe('kimi-test-runner');
       expect(source.close).toHaveBeenCalledOnce();
       expect(forked.onEvent).toHaveBeenCalledOnce();

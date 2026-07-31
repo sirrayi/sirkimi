@@ -12,7 +12,13 @@ A customized fork of [Kimi Code CLI](https://github.com/MoonshotAI/kimi-code) (M
 
 **Versioning:** `MAJOR.SEMI.MINOR` — major for big changes, semi for feature-level updates, minor for fixes. First public release: **1.0.0**.
 
-**Install:** download the `skimi` binary for your platform from [Releases](https://github.com/sirrayi/sirkimi/releases), or build from source (`pnpm install && pnpm run build`, binary at `apps/kimi-code/dist/main.mjs`).
+**Install:**
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/sirrayi/sirkimi/main/install.sh | sh
+```
+
+Or download the `skimi` binary for your platform from [Releases](https://github.com/sirrayi/sirkimi/releases), or build from source (`pnpm install && pnpm run build`, binary at `apps/kimi-code/dist/main.mjs`).
 
 ---
 

@@ -91,6 +91,7 @@ function makeHost(options: { createGoalRejects?: boolean } = {}) {
     restoreInputText: vi.fn(),
     appendTranscriptEntry: vi.fn(),
     sendNormalUserInput: vi.fn(),
+    refreshQuota: vi.fn(),
     sendQueuedMessage: vi.fn(),
     shiftQueuedMessage: vi.fn(),
     btwPanelController: { routeEvent: vi.fn(() => false) },
