@@ -1035,34 +1035,40 @@ export class KimiTUI {
   /**
    * Refresh the bottom-left token usage readout from the session's
    * cumulative totals, folded into the configured window (session, day,
-   * week, month, forever) via the local daily-bucket store. Off hides it.
+   * week, month, forever) via the local daily-bucket store. The readout is
+   * always visible unless the window is "off" — before the session answers
+   * (or if the fetch fails) it shows zeros / the persisted aggregates.
    */
   private async fetchTokenUsage(): Promise<void> {
     const window = this.state.appState.tokenUsage ?? 'session';
-    if (window === 'off' || this.session === undefined) {
+    const label = tokenUsageWindowLabel(window);
+    if (window === 'off') {
       this.state.footer.setTokenUsage(null);
       return;
     }
     try {
-      const usage = await this.session.getUsage();
-      const totals = sessionUsageTotals(usage);
-      if (totals === null) {
-        this.state.footer.setTokenUsage(null);
-        return;
-      }
-      const sessionId = this.state.appState.sessionId || 'unknown';
       const store = await loadTokenUsageStore();
-      recordSessionUsage(store, sessionId, totals);
-      await saveTokenUsageStore(store);
+      let totals = { input: 0, output: 0 };
+      if (this.session !== undefined) {
+        const usage = await this.session.getUsage();
+        const sessionTotals = sessionUsageTotals(usage);
+        if (sessionTotals !== null) {
+          totals = sessionTotals;
+          const sessionId = this.state.appState.sessionId || 'unknown';
+          recordSessionUsage(store, sessionId, totals);
+          await saveTokenUsageStore(store);
+        }
+      }
       const stats = summarizeTokenUsage(store, window, totals);
       this.state.footer.setTokenUsage({
         input: stats.input,
         output: stats.output,
-        label: tokenUsageWindowLabel(window),
+        label,
       });
       this.state.ui.requestRender();
     } catch {
-      this.state.footer.setTokenUsage(null);
+      // Stay visible with zeros rather than vanishing on a transient error.
+      this.state.footer.setTokenUsage({ input: 0, output: 0, label });
     }
   }
 
