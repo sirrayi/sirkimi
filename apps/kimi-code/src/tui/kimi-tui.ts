@@ -1090,14 +1090,14 @@ export class KimiTUI {
       }
       const weekly =
         res.summary !== null && res.summary.limit > 0
-          ? { used: res.summary.used, limit: res.summary.limit }
+          ? { used: res.summary.used, limit: res.summary.limit, resetAt: res.summary.resetAt }
           : undefined;
       const fiveHourRow =
         res.limits.find((row) => row.window?.unit === 'hour' && row.window.duration === 5) ??
         res.limits[0];
       const fiveHour =
         fiveHourRow !== undefined && fiveHourRow.limit > 0
-          ? { used: fiveHourRow.used, limit: fiveHourRow.limit }
+          ? { used: fiveHourRow.used, limit: fiveHourRow.limit, resetAt: fiveHourRow.resetAt }
           : undefined;
       this.state.footer.setQuota(
         fiveHour === undefined && weekly === undefined ? null : { fiveHour, weekly },

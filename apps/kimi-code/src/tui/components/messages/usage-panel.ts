@@ -8,6 +8,7 @@ import type { Component } from '@moonshot-ai/pi-tui';
 import { truncateToWidth, visibleWidth } from '@moonshot-ai/pi-tui';
 import { formatDuration } from '@moonshot-ai/kimi-code-oauth';
 import type { SessionUsage, TokenUsage } from '@moonshot-ai/kimi-code-sdk';
+import chalk from 'chalk';
 
 import {
   formatTokenCount,
@@ -80,6 +81,8 @@ export interface UsageReportOptions {
   readonly maxContextTokens: number;
   readonly managedUsage?: ManagedUsageReport;
   readonly managedUsageError?: string;
+  /** Daily token buckets for the activity grid (from the token-usage store). */
+  readonly activityDays?: Record<string, ActivityDay>;
 }
 
 export interface ManagedUsageReportLineOptions {
@@ -276,6 +279,105 @@ export function buildManagedUsageReportLines(options: ManagedUsageReportLineOpti
   );
 }
 
+export interface ActivityDay {
+  readonly input: number;
+  readonly output: number;
+}
+
+/** GitHub-dark contribution greens: index 0 is the empty cell. */
+const ACTIVITY_SHADES = ['#3B4048', '#0E4429', '#006D32', '#26A641', '#39D353'] as const;
+const ACTIVITY_WEEKS = 10;
+
+/**
+ * GitHub-profile-style activity grid: one row per weekday, one column per
+ * week, oldest on the left. Cell intensity is the day's total tokens
+ * (in+out) relative to the peak day in the window. Ends with a legend, the
+ * peak day, and recent-window totals.
+ */
+export function buildActivitySection(
+  days: Record<string, ActivityDay>,
+  accent: Colorize,
+  value: Colorize,
+  muted: Colorize,
+  now: Date = new Date(),
+): string[] {
+  const entries = Object.entries(days).filter(([, v]) => v.input + v.output > 0);
+  if (entries.length === 0) return [];
+
+  const dayKey = (d: Date): string => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+  const offsetDate = (offset: number): Date => {
+    const d = new Date(now);
+    d.setDate(d.getDate() - offset);
+    return d;
+  };
+  const tokensAt = (offset: number): number => {
+    const v = days[dayKey(offsetDate(offset))];
+    return v === undefined ? 0 : v.input + v.output;
+  };
+
+  // offsets into the past for every grid cell, by (weekday row, week col)
+  const todayDow = now.getDay();
+  const cell = (row: number, week: number): number => week * 7 + (todayDow - row);
+  const maxOffset = (ACTIVITY_WEEKS - 1) * 7 + todayDow;
+  let peak = 0;
+  let peakKey = '';
+  for (let offset = 0; offset <= maxOffset; offset++) {
+    const t = tokensAt(offset);
+    if (t > peak) {
+      peak = t;
+      peakKey = dayKey(offsetDate(offset));
+    }
+  }
+  const level = (t: number): number => {
+    if (t <= 0 || peak <= 0) return 0;
+    return Math.min(4, Math.max(1, Math.ceil((t / peak) * 4)));
+  };
+  const paintCell = (t: number): string => chalk.hex(ACTIVITY_SHADES[level(t)]!)('■');
+
+  const lines: string[] = [accent(`Activity — last ${String(ACTIVITY_WEEKS)} weeks`)];
+  for (let row = 0; row < 7; row++) {
+    let line = '  ';
+    for (let week = ACTIVITY_WEEKS - 1; week >= 0; week--) {
+      const offset = cell(row, week);
+      line += offset < 0 ? '  ' : paintCell(tokensAt(offset)) + ' ';
+    }
+    lines.push(line.trimEnd());
+  }
+
+  const legendCells = ACTIVITY_SHADES.map((hex) => chalk.hex(hex)('■')).join(' ');
+  lines.push(`  ${muted('less')} ${legendCells} ${muted('more')}`);
+  if (peakKey.length > 0) {
+    lines.push(`  ${muted('peak')}  ${value(formatTokenCount(peak))} ${muted('on')} ${value(peakKey)}`);
+  }
+
+  const today = tokensAt(0);
+  const sumSince = (daysBack: number): { input: number; output: number } => {
+    let input = 0;
+    let output = 0;
+    for (let offset = 0; offset <= daysBack; offset++) {
+      const v = days[dayKey(offsetDate(offset))];
+      if (v !== undefined) {
+        input += v.input;
+        output += v.output;
+      }
+    }
+    return { input, output };
+  };
+  const week = sumSince(6);
+  const month = sumSince(29);
+  lines.push(
+    `  ${muted('today')}  ${value(formatTokenCount(today))}  ` +
+      `${muted('7d')}  ${value(formatTokenCount(week.input + week.output))}  ` +
+      `${muted('30d')}  ${value(formatTokenCount(month.input + month.output))}`,
+  );
+  return lines;
+}
+
 export function buildUsageReportLines(options: UsageReportOptions): string[] {
   const accent = (text: string) => currentTheme.boldFg('primary', text);
   const value = (text: string) => currentTheme.fg('text', text);
@@ -317,6 +419,14 @@ export function buildUsageReportLines(options: UsageReportOptions): string[] {
   if (managedSection.length > 0) {
     lines.push('');
     lines.push(...managedSection);
+  }
+
+  if (options.activityDays !== undefined) {
+    const activitySection = buildActivitySection(options.activityDays, accent, value, muted);
+    if (activitySection.length > 0) {
+      lines.push('');
+      lines.push(...activitySection);
+    }
   }
 
   const extraSection = buildExtraUsageSection(

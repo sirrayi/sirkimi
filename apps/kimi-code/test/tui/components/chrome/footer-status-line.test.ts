@@ -306,7 +306,7 @@ describe('FooterComponent tips toggle', () => {
 });
 
 describe('FooterComponent quota readout', () => {
-  it('renders both quota windows beside the context readout when set', () => {
+  it('renders context first, then the quota block flush right', () => {
     const footer = new FooterComponent({
       ...baseState,
       contextTokens: 100,
@@ -318,11 +318,28 @@ describe('FooterComponent quota readout', () => {
     });
 
     const line2 = plain(footer.render(120)[1]!);
+    expect(line2).toContain('context: 10%');
     expect(line2).toContain('5h: 12%');
     expect(line2).toContain('week: 4%');
-    expect(line2).toContain('context: 10%');
+    expect(line2.indexOf('context:')).toBeLessThan(line2.indexOf('5h:'));
     expect(line2.indexOf('5h:')).toBeLessThan(line2.indexOf('week:'));
-    expect(line2.indexOf('week:')).toBeLessThan(line2.indexOf('context:'));
+  });
+
+  it('shows reset countdowns on their own row below the quota', () => {
+    const footer = new FooterComponent({ ...baseState });
+    footer.setQuota({
+      fiveHour: { used: 6, limit: 50, resetAt: new Date(Date.now() + 3 * 3600_000).toISOString() },
+      weekly: {
+        used: 40,
+        limit: 1000,
+        resetAt: new Date(Date.now() + (5 * 24 + 7) * 3600_000).toISOString(),
+      },
+    });
+
+    const lines = footer.render(120).map(plain);
+    expect(lines).toHaveLength(3);
+    expect(lines[2]).toContain('left');
+    expect(lines[2]).toMatch(/3h(\d+m)? left · 5d7h left/);
   });
 
   it('renders only the windows that are known', () => {

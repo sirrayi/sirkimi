@@ -1,7 +1,7 @@
 import { visibleWidth } from '@moonshot-ai/pi-tui';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { buildUsageReportLines, UsagePanelComponent } from '#/tui/components/messages/usage-panel';
+import { buildActivitySection, buildUsageReportLines, UsagePanelComponent } from '#/tui/components/messages/usage-panel';
 import { currentTheme, darkColors, lightColors } from '#/tui/theme';
 
 afterEach(() => {
@@ -283,5 +283,55 @@ describe('UsagePanelComponent', () => {
     currentTheme.setPalette(lightColors);
     component.invalidate();
     expect(bodyOf()).toContain(lightColors.text);
+  });
+});
+
+describe('buildActivitySection', () => {
+  it('renders the grid, legend, peak, and window totals', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-07-31T12:00:00'));
+    try {
+      const days: Record<string, { input: number; output: number }> = {};
+      const key = (offset: number): string => {
+        const d = new Date('2026-07-31T12:00:00');
+        d.setDate(d.getDate() - offset);
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      };
+      days[key(0)] = { input: 1000, output: 100 };
+      days[key(3)] = { input: 5000, output: 500 };
+
+      const lines = buildActivitySection(days, (s) => s, (s) => s, (s) => s, new Date('2026-07-31T12:00:00'));
+      const text = strip(lines.join('\n'));
+
+      expect(text).toContain('Activity');
+      expect(text).toContain('less');
+      expect(text).toContain('more');
+      expect(text).toContain('peak');
+      expect(text).toContain('today');
+      expect(text).toContain('7d');
+      expect(text).toContain('30d');
+      // 10 weeks of cells on every weekday row
+      const gridRows = lines.filter((l) => strip(l).includes('■'));
+      expect(gridRows.length).toBeGreaterThanOrEqual(7);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('renders nothing when there is no activity', () => {
+    const lines = buildActivitySection({}, (s) => s, (s) => s, (s) => s, new Date('2026-07-31T12:00:00'));
+    expect(lines).toEqual([]);
+  });
+
+  it('is included in the usage report when activity days are provided', () => {
+    const key = '2026-07-31';
+    const lines = buildUsageReportLines({
+      sessionUsage: {},
+      contextUsage: 0,
+      contextTokens: 0,
+      maxContextTokens: 0,
+      activityDays: { [key]: { input: 42, output: 7 } },
+    });
+    expect(strip(lines.join('\n'))).toContain('Activity');
   });
 });

@@ -20,6 +20,7 @@ import {
   withFeedbackVersionPrefix,
 } from '../constant/feedback';
 import { isManagedUsageProvider } from '../constant/kimi-tui';
+import { loadTokenUsageStore } from '../utils/token-usage';
 import { submitFeedbackWithAttachments } from '../../feedback/feedback-attachments';
 import { formatErrorMessage } from '../utils/event-payload';
 import { openUrl } from '#/utils/open-url';
@@ -121,6 +122,7 @@ interface ManagedUsageResult {
 export async function showUsage(host: SlashCommandHost): Promise<void> {
   const sessionUsage = await loadSessionUsageReport(host);
   const managedUsage = await loadManagedUsageReport(host);
+  const usageStore = await loadTokenUsageStore();
   const reportArgs = {
     sessionUsage: sessionUsage.usage,
     sessionUsageError: sessionUsage.error,
@@ -129,6 +131,7 @@ export async function showUsage(host: SlashCommandHost): Promise<void> {
     maxContextTokens: host.state.appState.maxContextTokens,
     managedUsage: managedUsage?.usage,
     managedUsageError: managedUsage?.error,
+    activityDays: usageStore.days,
   };
   const panel = new UsagePanelComponent(() => buildUsageReportLines(reportArgs), 'primary');
   host.state.transcriptContainer.addChild(panel);

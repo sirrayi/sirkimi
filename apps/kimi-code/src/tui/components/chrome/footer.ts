@@ -13,7 +13,7 @@ import { effectiveModelAlias } from '@moonshot-ai/kimi-code-sdk';
 
 import { ALL_TIPS, type ToolbarTip } from '#/tui/constant/tips';
 import { isRainbowDancing, renderDanceFooterModel } from '#/tui/easter-eggs/dance';
-import { currentTheme } from '#/tui/theme';
+import { currentTheme, type ColorToken } from '#/tui/theme';
 import type { ColorPalette } from '#/tui/theme/colors';
 import type { AppState } from '#/tui/types';
 import {
@@ -165,6 +165,24 @@ function shortenCwd(path: string): string {
 }
 
 /**
+ * "3h left" / "5d7h left" countdown for a quota window reset. Returns null
+ * when the timestamp is missing, invalid, or already in the past.
+ */
+export function formatResetCountdown(resetAt: string | undefined, now: number = Date.now()): string | null {
+  if (resetAt === undefined) return null;
+  const ms = Date.parse(resetAt) - now;
+  if (!Number.isFinite(ms) || ms <= 0) return null;
+  const mins = Math.ceil(ms / 60_000);
+  if (mins < 60) return `${String(mins)}m left`;
+  const hours = Math.floor(mins / 60);
+  const remMins = mins % 60;
+  if (hours < 24) return remMins > 0 ? `${String(hours)}h${String(remMins)}m left` : `${String(hours)}h left`;
+  const days = Math.floor(hours / 24);
+  const remHours = hours % 24;
+  return remHours > 0 ? `${String(days)}d${String(remHours)}h left` : `${String(days)}d left`;
+}
+
+/**
  * Footer context readout. Percent comes from the exact token counts when
  * both are known (the ratio can lag a step behind); otherwise it falls
  * back to the precomputed ratio. Counts use the shared 1024-based
@@ -209,8 +227,8 @@ export class FooterComponent implements Component {
   private backgroundAgentCount = 0;
   /** Plan quota snapshot for the footer readout; null hides it. */
   private quota: {
-    fiveHour?: { used: number; limit: number };
-    weekly?: { used: number; limit: number };
+    fiveHour?: { used: number; limit: number; resetAt?: string };
+    weekly?: { used: number; limit: number; resetAt?: string };
   } | null = null;
   /** Token usage snapshot for the bottom-left readout; null hides it. */
   private tokenUsage: { input: number; output: number; label: string } | null = null;
@@ -283,8 +301,8 @@ export class FooterComponent implements Component {
    */
   setQuota(
     quota: {
-      fiveHour?: { used: number; limit: number };
-      weekly?: { used: number; limit: number };
+      fiveHour?: { used: number; limit: number; resetAt?: string };
+      weekly?: { used: number; limit: number; resetAt?: string };
     } | null,
   ): void {
     this.quota = quota;
@@ -312,7 +330,7 @@ export class FooterComponent implements Component {
       customLine = this.statusLineRunner.current();
     }
 
-    // ── Right readout: quota windows (when known) + context ──
+    // ── Right readout: context block first, quota block flush right ──
     const contextText = formatContextStatus(
       state.contextUsage,
       state.contextTokens,
@@ -328,8 +346,17 @@ export class FooterComponent implements Component {
       quotaParts.push(`week: ${String(usagePercent(weekly.used, weekly.limit))}%`);
     }
     const rightText =
-      quotaParts.length > 0 ? `${quotaParts.join(' · ')} · ${contextText}` : contextText;
+      quotaParts.length > 0 ? `${contextText} · ${quotaParts.join(' · ')}` : contextText;
     const rightWidth = visibleWidth(rightText);
+
+    // Reset countdowns for the quota windows, same order, dimmer — rendered
+    // on the row below the percentages, flush right.
+    const resetParts: string[] = [];
+    const fiveHourReset = formatResetCountdown(fiveHour?.resetAt);
+    if (fiveHourReset !== null) resetParts.push(fiveHourReset);
+    const weeklyReset = formatResetCountdown(weekly?.resetAt);
+    if (weeklyReset !== null) resetParts.push(weeklyReset);
+    const resetsText = resetParts.join(' · ');
 
     // Bottom-left readout: token usage for the configured window.
     const tu = this.tokenUsage;
@@ -391,14 +418,18 @@ export class FooterComponent implements Component {
     }
 
     // Status readout moved up: the footer collapses to one line unless a
-    // transient hint or the token usage readout needs the second row.
-    if (statusOnLine1 && !this.transientHint && tokenText.length === 0) {
+    // transient hint, token usage, or reset countdowns need the second row.
+    if (statusOnLine1 && !this.transientHint && tokenText.length === 0 && resetsText.length === 0) {
       return [truncateToWidth(line1, width)];
     }
 
-    // ── Line 2: transient hint or token usage (left) + quota + context (right) ──
-    const line2Right = statusOnLine1 ? '' : rightText;
+    // ── Line 2: transient hint or token usage (left) + readout/resets (right) ──
+    // When the status readout lives on line 1, line 2's right slot carries
+    // the reset countdowns; otherwise it carries the context+quota readout
+    // and the countdowns get their own third row.
+    const line2Right = statusOnLine1 ? resetsText : rightText;
     const line2RightWidth = visibleWidth(line2Right);
+    const line2RightColor: ColorToken = statusOnLine1 ? 'textDim' : 'text';
     const line2Left = this.transientHint
       ? null
       : tokenText.length > 0
@@ -417,16 +448,21 @@ export class FooterComponent implements Component {
       line2 =
         chalk.hex(colors.warning).bold(shownHint) +
         ' '.repeat(pad) +
-        chalk.hex(colors.text)(line2Right);
+        chalk.hex(colors[line2RightColor])(line2Right);
     } else if (line2Left !== null) {
       const pad = Math.max(1, width - line2LeftWidth - line2RightWidth);
-      line2 = line2Left + ' '.repeat(pad) + chalk.hex(colors.text)(line2Right);
+      line2 = line2Left + ' '.repeat(pad) + chalk.hex(colors[line2RightColor])(line2Right);
     } else {
       const leftPad = Math.max(0, width - line2RightWidth);
-      line2 = ' '.repeat(leftPad) + chalk.hex(colors.text)(line2Right);
+      line2 = ' '.repeat(leftPad) + chalk.hex(colors[line2RightColor])(line2Right);
     }
 
-    return [truncateToWidth(line1, width), truncateToWidth(line2, width)];
+    const out = [truncateToWidth(line1, width), truncateToWidth(line2, width)];
+    if (!statusOnLine1 && resetsText.length > 0) {
+      const resetsPad = Math.max(0, width - visibleWidth(resetsText));
+      out.push(truncateToWidth(' '.repeat(resetsPad) + chalk.hex(colors.textMuted)(resetsText), width));
+    }
+    return out;
   }
 
   /**
