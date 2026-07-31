@@ -35,6 +35,7 @@ import { quoteShellArg } from '#/utils/shell-quote';
 import { restoreTerminalModes } from '#/utils/terminal-restore';
 
 import { BannerProvider } from './banner/banner-provider';
+import { pickSpinnerWord, setTurnSpinnerWord } from './constant/spinner-words';
 import {
   loadTokenUsageStore,
   recordSessionUsage,
@@ -1107,6 +1108,9 @@ export class KimiTUI {
     }
   }
 
+  /** Whimsical verb for this turn's spinner labels (moon loader + thinking). */
+  private spinnerWord = 'thinking';
+
   private startQuotaPolling(): void {
     this.refreshQuota();
     this.quotaPollTimer = setInterval(() => {
@@ -1414,6 +1418,9 @@ export class KimiTUI {
     // A prompt is starting — refresh quota/token readouts now so the footer
     // reflects the new turn immediately instead of waiting for turn end.
     this.refreshQuota();
+    // New turn, new whimsical verb for the spinner labels.
+    this.spinnerWord = pickSpinnerWord();
+    setTurnSpinnerWord(this.spinnerWord);
 
     this.patchLivePane({
       mode: 'waiting',
@@ -2585,7 +2592,12 @@ export class KimiTUI {
         this.state.ui.requestRender();
         return;
       case 'waiting': {
-        const spinner = this.ensureActivitySpinner('moon');
+        // When the spinner is embedded in the agent-swarm progress row, the
+        // row supplies its own label — keep the inline spinner wordless.
+        const spinner = this.ensureActivitySpinner(
+          'moon',
+          placeSpinnerInAgentSwarm ? '' : `${this.spinnerWord}...`,
+        );
         this.syncAgentSwarmActivitySpinner(placeSpinnerInAgentSwarm ? spinner : undefined);
         if (placeSpinnerInAgentSwarm) break;
         this.state.activityContainer.addChild(
@@ -2603,7 +2615,7 @@ export class KimiTUI {
         break;
       }
       case 'composing': {
-        const spinner = this.ensureActivitySpinner('braille', 'working...', (s) =>
+        const spinner = this.ensureActivitySpinner('moon', `${this.spinnerWord}...`, (s) =>
           currentTheme.fg('primary', s),
         );
         this.syncAgentSwarmActivitySpinner(undefined);
@@ -2617,7 +2629,10 @@ export class KimiTUI {
         break;
       }
       case 'tool': {
-        const spinner = this.ensureActivitySpinner('moon');
+        const spinner = this.ensureActivitySpinner(
+          'moon',
+          placeSpinnerInAgentSwarm ? '' : `${this.spinnerWord}...`,
+        );
         this.syncAgentSwarmActivitySpinner(placeSpinnerInAgentSwarm ? spinner : undefined);
         if (placeSpinnerInAgentSwarm) break;
         this.state.activityContainer.addChild(

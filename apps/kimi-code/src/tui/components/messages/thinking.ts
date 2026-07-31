@@ -8,12 +8,12 @@
 import { Text, truncateToWidth, type Component, type TUI } from '@moonshot-ai/pi-tui';
 
 import {
-  BRAILLE_SPINNER_FRAMES,
-  BRAILLE_SPINNER_INTERVAL_MS,
   MESSAGE_INDENT,
+  MOON_SPINNER_FRAMES,
+  MOON_SPINNER_INTERVAL_MS,
   THINKING_PREVIEW_LINES,
 } from '#/tui/constant/rendering';
-import { pickSpinnerWord } from '#/tui/constant/spinner-words';
+import { currentTurnSpinnerWord } from '#/tui/constant/spinner-words';
 import { STATUS_BULLET } from '#/tui/constant/symbols';
 import { currentTheme } from '#/tui/theme';
 import { isRenderCacheEnabled } from '#/tui/utils/render-cache';
@@ -48,7 +48,7 @@ export class ThinkingComponent implements Component {
     this.showMarker = showMarker;
     this.mode = mode;
     this.ui = ui;
-    this.spinnerWord = spinnerWord ?? pickSpinnerWord();
+    this.spinnerWord = spinnerWord ?? currentTurnSpinnerWord();
     this.textComponent = new Text(this.styled(text), 0, 0);
     if (mode === 'live') {
       this.startSpinner();
@@ -111,7 +111,7 @@ export class ThinkingComponent implements Component {
           : contentLines;
       const spinner = currentTheme.fg(
         'textDim',
-        `${BRAILLE_SPINNER_FRAMES[this.spinnerFrame] ?? BRAILLE_SPINNER_FRAMES[0]} `,
+        `${MOON_SPINNER_FRAMES[this.spinnerFrame] ?? MOON_SPINNER_FRAMES[0]} `,
       );
       rendered = [
         '',
@@ -150,10 +150,10 @@ export class ThinkingComponent implements Component {
   private startSpinner(): void {
     if (this.ui === undefined || this.spinnerInterval !== undefined) return;
     this.spinnerInterval = setInterval(() => {
-      this.spinnerFrame = (this.spinnerFrame + 1) % BRAILLE_SPINNER_FRAMES.length;
+      this.spinnerFrame = (this.spinnerFrame + 1) % MOON_SPINNER_FRAMES.length;
       this.markRenderDirty();
       this.ui?.requestRender();
-    }, BRAILLE_SPINNER_INTERVAL_MS);
+    }, MOON_SPINNER_INTERVAL_MS);
   }
 
   private stopSpinner(): void {

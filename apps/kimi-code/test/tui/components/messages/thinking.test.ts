@@ -15,9 +15,9 @@ describe('ThinkingComponent', () => {
     const component = new ThinkingComponent('working it out', true, 'live', undefined, 'thinking');
     const out = strip(component.render(80).join('\n'));
 
-    expect(out).toContain('⠋ thinking...');
-    expect(out).not.toContain('  ⠋ thinking...');
-    expect(out).not.toContain(`${STATUS_BULLET}⠋`);
+    expect(out).toContain('🌑 thinking...');
+    expect(out).not.toContain('  🌑 thinking...');
+    expect(out).not.toContain(`${STATUS_BULLET}🌑`);
     expect(out).toContain('  working it out');
   });
 
@@ -25,14 +25,14 @@ describe('ThinkingComponent', () => {
     const component = new ThinkingComponent('x', true, 'live', undefined, 'canoodling');
     const out = strip(component.render(80).join('\n'));
 
-    expect(out).toContain('⠋ canoodling...');
+    expect(out).toContain('🌑 canoodling...');
   });
 
   it('picks a word from the list when none is given', () => {
     const component = new ThinkingComponent('x', true, 'live');
     const out = strip(component.render(80).join('\n'));
 
-    expect(out).toMatch(/⠋ [a-z]+\.\.\./);
+    expect(out).toMatch(/🌑 [a-z]+\.\.\./);
   });
 
   it('keeps live thinking height-limited to the tail', () => {
@@ -54,11 +54,11 @@ describe('ThinkingComponent', () => {
       requestRender,
     } as unknown as TUI, 'thinking');
 
-    expect(strip(component.render(80).join('\n'))).toContain('⠋ thinking...');
+    expect(strip(component.render(80).join('\n'))).toContain('🌑 thinking...');
 
-    vi.advanceTimersByTime(80);
+    vi.advanceTimersByTime(120);
     expect(requestRender).toHaveBeenCalled();
-    expect(strip(component.render(80).join('\n'))).toContain('⠙ thinking...');
+    expect(strip(component.render(80).join('\n'))).toContain('🌒 thinking...');
 
     component.finalize();
     requestRender.mockClear();

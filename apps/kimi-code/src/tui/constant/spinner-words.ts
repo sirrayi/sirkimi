@@ -40,3 +40,18 @@ export const SPINNER_WORDS = [
 export function pickSpinnerWord(random: () => number = Math.random): string {
   return SPINNER_WORDS[Math.floor(random() * SPINNER_WORDS.length)] ?? 'thinking';
 }
+
+/**
+ * The verb for the current turn, shared by every loading surface (activity
+ * pane moon loader, transcript thinking line) so they never show two
+ * different words for the same turn. Set at the start of each turn.
+ */
+let turnWord = 'thinking';
+
+export function setTurnSpinnerWord(word: string): void {
+  turnWord = word;
+}
+
+export function currentTurnSpinnerWord(): string {
+  return turnWord;
+}
