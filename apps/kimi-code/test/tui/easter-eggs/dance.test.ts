@@ -58,7 +58,7 @@ describe('RainbowDance', () => {
     expect(dance.phase).toBe(0);
   });
 
-  it('freezes into a static rainbow after the flow when holding', () => {
+  it('keeps flowing past the flow window when holding', () => {
     vi.useFakeTimers();
     const dance = new RainbowDance(vi.fn());
 
@@ -66,9 +66,10 @@ describe('RainbowDance', () => {
     vi.advanceTimersByTime(DANCE_FLOW_MS + DANCE_FRAME_MS);
 
     expect(dance.colored).toBe(true);
-    const frozen = dance.phase;
+    const flowing = dance.phase;
+    expect(flowing).toBeGreaterThan(0);
     vi.advanceTimersByTime(DANCE_FRAME_MS * 10);
-    expect(dance.phase).toBe(frozen);
+    expect(dance.phase).toBe(flowing + 10);
   });
 
   it('stops on demand back to the default colors and clears its timers', () => {

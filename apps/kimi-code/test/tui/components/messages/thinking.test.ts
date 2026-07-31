@@ -12,13 +12,27 @@ const longThinking = ['line1', 'line2', 'line3', 'line4', 'line5', 'line6', 'lin
 
 describe('ThinkingComponent', () => {
   it('shows the live spinner header before thinking content', () => {
-    const component = new ThinkingComponent('working it out', true, 'live');
+    const component = new ThinkingComponent('working it out', true, 'live', undefined, 'thinking');
     const out = strip(component.render(80).join('\n'));
 
     expect(out).toContain('⠋ thinking...');
     expect(out).not.toContain('  ⠋ thinking...');
     expect(out).not.toContain(`${STATUS_BULLET}⠋`);
     expect(out).toContain('  working it out');
+  });
+
+  it('renders a custom spinner word', () => {
+    const component = new ThinkingComponent('x', true, 'live', undefined, 'canoodling');
+    const out = strip(component.render(80).join('\n'));
+
+    expect(out).toContain('⠋ canoodling...');
+  });
+
+  it('picks a word from the list when none is given', () => {
+    const component = new ThinkingComponent('x', true, 'live');
+    const out = strip(component.render(80).join('\n'));
+
+    expect(out).toMatch(/⠋ [a-z]+\.\.\./);
   });
 
   it('keeps live thinking height-limited to the tail', () => {
@@ -38,7 +52,7 @@ describe('ThinkingComponent', () => {
     const requestRender = vi.fn();
     const component = new ThinkingComponent('step', true, 'live', {
       requestRender,
-    } as unknown as TUI);
+    } as unknown as TUI, 'thinking');
 
     expect(strip(component.render(80).join('\n'))).toContain('⠋ thinking...');
 

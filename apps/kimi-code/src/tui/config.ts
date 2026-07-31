@@ -36,6 +36,8 @@ export type StatusLineItem = (typeof STATUS_LINE_ITEMS)[number];
 export const StatusLineFileConfigSchema = z.object({
   items: z.array(z.string()).optional(),
   command: z.string().optional(),
+  /** false hides the rotating hint tips in the footer. */
+  tips: z.boolean().optional(),
 });
 
 export const StatusLineConfigSchema = z.object({
@@ -43,12 +45,15 @@ export const StatusLineConfigSchema = z.object({
   items: z.array(z.enum(STATUS_LINE_ITEMS)).nullable(),
   /** User command whose first stdout line replaces footer line 1; null disables. */
   command: z.string().nullable(),
+  /** Whether the rotating hint tips render; absent means enabled. */
+  tips: z.boolean().optional(),
 });
 export type StatusLineConfig = z.infer<typeof StatusLineConfigSchema>;
 
 export const DEFAULT_STATUS_LINE_CONFIG: StatusLineConfig = {
   items: null,
   command: null,
+  tips: true,
 };
 
 export const TuiConfigFileSchema = z.object({
@@ -201,6 +206,9 @@ export function normalizeTuiConfig(
         statusLineCommand === undefined || statusLineCommand.length === 0
           ? null
           : statusLineCommand,
+      // Only materialize the opt-out; undefined means enabled and keeps
+      // older fixtures/snapshots without the key comparing equal.
+      tips: config.status_line?.tips === false ? false : undefined,
     },
   });
 }
@@ -218,6 +226,9 @@ export function renderTuiConfig(config: TuiConfig): string {
   if (statusCommand) {
     statusLines.push(`command = "${escapeTomlBasicString(statusCommand)}"`);
   }
+  if (config.statusLine?.tips === false) {
+    statusLines.push('tips = false');
+  }
   const statusSection =
     statusLines.length > 0
       ? `[status_line]\n${statusLines.join('\n')}\n`
@@ -227,6 +238,8 @@ export function renderTuiConfig(config: TuiConfig): string {
 # Or render your own: a command whose first stdout line replaces footer line 1.
 # It receives a JSON snapshot (model, cwd, git, usage, mode) on stdin.
 # command = "~/.kimi-code/statusline.sh"
+# Hide the rotating hint tips:
+# tips = false
 `;
   return `# ~/.kimi-code/tui.toml
 # Client preferences for kimi-code.

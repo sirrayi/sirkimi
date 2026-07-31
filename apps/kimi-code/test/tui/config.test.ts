@@ -76,6 +76,24 @@ disable_paste_burst = true
     expect(config.disablePasteBurst).toBe(true);
   });
 
+  it('parses status_line tips = false and round-trips it', async () => {
+    const config = parseTuiConfig(`
+[status_line]
+tips = false
+`);
+
+    expect(config.statusLine?.tips).toBe(false);
+
+    await saveTuiConfig(config, filePath);
+    expect((await loadTuiConfig(filePath)).statusLine?.tips).toBe(false);
+  });
+
+  it('defaults status_line tips to enabled when omitted', () => {
+    const config = parseTuiConfig(`theme = "dark"`);
+
+    expect(config.statusLine?.tips ?? true).toBe(true);
+  });
+
   it('normalizes an empty editor command to auto-detect', () => {
     const config = parseTuiConfig(`
 [editor]

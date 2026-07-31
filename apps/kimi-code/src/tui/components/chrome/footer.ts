@@ -207,6 +207,8 @@ export class FooterComponent implements Component {
    */
   private backgroundBashTaskCount = 0;
   private backgroundAgentCount = 0;
+  /** Plan quota snapshot for the footer readout; null hides it. */
+  private quota: { used: number; limit: number } | null = null;
 
   constructor(state: AppState, onRefresh: () => void = () => {}) {
     this.state = state;
@@ -268,6 +270,15 @@ export class FooterComponent implements Component {
     this.backgroundAgentCount = Math.max(0, counts.agentTasks);
   }
 
+  /**
+   * Plan quota snapshot rendered beside the context readout on line 2,
+   * e.g. `quota: 4% (40/1000)`. Pass null to hide (unmanaged provider or
+   * fetch failure).
+   */
+  setQuota(quota: { used: number; limit: number } | null): void {
+    this.quota = quota;
+  }
+
   invalidate(): void {}
 
   render(width: number): string[] {
@@ -303,7 +314,8 @@ export class FooterComponent implements Component {
       // or the user dropped 'tips' from items.
       let tipText = '';
       const tipsInline = order.includes('tips');
-      const showTips = !tipsInline && (configured === null || configured.includes('tips'));
+      const tipsEnabled = this.state.statusLine?.tips !== false;
+      const showTips = tipsEnabled && !tipsInline && (configured === null || configured.includes('tips'));
       if (showTips) {
         const { primary, pair } = tipsForIndex(currentTipIndex());
         const gap = 2;
@@ -325,29 +337,34 @@ export class FooterComponent implements Component {
       }
     }
 
-    // ── Line 2: transient hint (bottom-left) + context (right) ──
+    // ── Line 2: transient hint (bottom-left) + quota + context (right) ──
     const contextText = formatContextStatus(
       state.contextUsage,
       state.contextTokens,
       state.maxContextTokens,
     );
-    const contextWidth = visibleWidth(contextText);
+    const quota = this.quota;
+    const rightText =
+      quota !== null && quota.limit > 0
+        ? `quota: ${String(usagePercent(quota.used, quota.limit))}% (${String(quota.used)}/${String(quota.limit)}) · ${contextText}`
+        : contextText;
+    const rightWidth = visibleWidth(rightText);
     let line2: string;
     if (this.transientHint) {
-      const maxHintWidth = Math.max(0, width - contextWidth - 1);
+      const maxHintWidth = Math.max(0, width - rightWidth - 1);
       const shownHint =
         visibleWidth(this.transientHint) <= maxHintWidth
           ? this.transientHint
           : truncateToWidth(this.transientHint, maxHintWidth, '…');
       const hintWidth = visibleWidth(shownHint);
-      const pad = Math.max(0, width - hintWidth - contextWidth);
+      const pad = Math.max(0, width - hintWidth - rightWidth);
       line2 =
         chalk.hex(colors.warning).bold(shownHint) +
         ' '.repeat(pad) +
-        chalk.hex(colors.text)(contextText);
+        chalk.hex(colors.text)(rightText);
     } else {
-      const leftPad = Math.max(0, width - contextWidth);
-      line2 = ' '.repeat(leftPad) + chalk.hex(colors.text)(contextText);
+      const leftPad = Math.max(0, width - rightWidth);
+      line2 = ' '.repeat(leftPad) + chalk.hex(colors.text)(rightText);
     }
 
     return [truncateToWidth(line1, width), truncateToWidth(line2, width)];

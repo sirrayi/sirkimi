@@ -260,3 +260,40 @@ describe('StatusLineCommandRunner', () => {
     expect(line1).not.toContain('aaa');
   });
 });
+
+describe('FooterComponent tips toggle', () => {
+  it('hides the rotating tips when status_line tips = false', () => {
+    const state: AppState = {
+      ...baseState,
+      statusLine: { items: null, command: null, tips: false },
+    };
+    const line1 = plain(new FooterComponent(state).render(200)[0]!);
+
+    expect(line1.trimEnd()).toMatch(/kimi-k2 {2}\/tmp\/project$/);
+  });
+});
+
+describe('FooterComponent quota readout', () => {
+  it('renders the quota beside the context readout when set', () => {
+    const footer = new FooterComponent({
+      ...baseState,
+      contextTokens: 100,
+      maxContextTokens: 1000,
+    });
+    footer.setQuota({ used: 40, limit: 1000 });
+
+    const line2 = plain(footer.render(120)[1]!);
+    expect(line2).toContain('quota: 4% (40/1000)');
+    expect(line2).toContain('context: 10%');
+    expect(line2.indexOf('quota:')).toBeLessThan(line2.indexOf('context:'));
+  });
+
+  it('omits the quota when unset or zero-limit', () => {
+    const unset = new FooterComponent({ ...baseState });
+    expect(plain(unset.render(120)[1]!)).not.toContain('quota:');
+
+    const zeroLimit = new FooterComponent({ ...baseState });
+    zeroLimit.setQuota({ used: 0, limit: 0 });
+    expect(plain(zeroLimit.render(120)[1]!)).not.toContain('quota:');
+  });
+});

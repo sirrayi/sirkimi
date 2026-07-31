@@ -96,6 +96,7 @@ import { ActivityPaneComponent, type ActivityPaneMode } from './components/panes
 import { QueuePaneComponent } from './components/panes/queue-pane';
 import type { TuiConfig } from './config';
 import {
+  isManagedUsageProvider,
   LLM_NOT_SET_MESSAGE,
   MAIN_AGENT_ID,
   NO_ACTIVE_SESSION_MESSAGE,
@@ -635,6 +636,7 @@ export class KimiTUI {
 
     // Mount only after init() succeeds; see mountFooter().
     this.mountFooter();
+    this.startQuotaPolling();
     this.renderWelcome();
     void this.loadBanner();
     this.setupAutocomplete();
@@ -874,6 +876,7 @@ export class KimiTUI {
     this.streamingUI.resetToolUi();
     this.disposeTranscriptChildren();
     this.editorKeyboard.dispose();
+    this.stopQuotaPolling();
     this.state.footer.dispose();
     for (const dispose of this.reverseRpcDisposers) {
       dispose();
@@ -999,6 +1002,49 @@ export class KimiTUI {
     const footerWrap = new GutterContainer(CHROME_GUTTER, CHROME_GUTTER);
     footerWrap.addChild(this.state.footer);
     this.state.ui.addChild(footerWrap);
+  }
+
+  /**
+   * Polls the managed-platform usage endpoint and feeds the weekly plan
+   * quota into the footer's line-2 readout (`quota: N% (used/limit)` next
+   * to the context percentage). Silent on any failure — unmanaged
+   * providers, network errors, and auth lapses just hide the readout.
+   */
+  private static readonly QUOTA_POLL_INTERVAL_MS = 300_000;
+  private quotaPollTimer: ReturnType<typeof setInterval> | null = null;
+
+  private startQuotaPolling(): void {
+    const refresh = async (): Promise<void> => {
+      try {
+        const appState = this.state.appState;
+        const providerKey = appState.availableModels[appState.model]?.provider;
+        if (!isManagedUsageProvider(providerKey)) {
+          this.state.footer.setQuota(null);
+          return;
+        }
+        const res = await this.harness.auth.getManagedUsage(providerKey);
+        if (res.kind === 'ok' && res.summary !== null && res.summary.limit > 0) {
+          this.state.footer.setQuota({ used: res.summary.used, limit: res.summary.limit });
+        } else {
+          this.state.footer.setQuota(null);
+        }
+        this.state.ui.requestRender();
+      } catch {
+        this.state.footer.setQuota(null);
+      }
+    };
+    void refresh();
+    this.quotaPollTimer = setInterval(() => {
+      void refresh();
+    }, KimiTUI.QUOTA_POLL_INTERVAL_MS);
+    this.quotaPollTimer.unref?.();
+  }
+
+  private stopQuotaPolling(): void {
+    if (this.quotaPollTimer !== null) {
+      clearInterval(this.quotaPollTimer);
+      this.quotaPollTimer = null;
+    }
   }
 
   // =========================================================================

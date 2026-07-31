@@ -13,6 +13,7 @@ import {
   MESSAGE_INDENT,
   THINKING_PREVIEW_LINES,
 } from '#/tui/constant/rendering';
+import { pickSpinnerWord } from '#/tui/constant/spinner-words';
 import { STATUS_BULLET } from '#/tui/constant/symbols';
 import { currentTheme } from '#/tui/theme';
 import { isRenderCacheEnabled } from '#/tui/utils/render-cache';
@@ -32,6 +33,7 @@ export class ThinkingComponent implements Component {
   // the cache and forces full re-wrap on every frame, which dominates CPU
   // once the transcript accumulates many finalized thinking blocks.
   private readonly textComponent: Text;
+  private readonly spinnerWord: string;
 
   private renderCache: { width: number; lines: string[] } | undefined;
 
@@ -40,11 +42,13 @@ export class ThinkingComponent implements Component {
     showMarker: boolean = true,
     mode: ThinkingRenderMode = 'finalized',
     ui?: TUI,
+    spinnerWord?: string,
   ) {
     this.text = text;
     this.showMarker = showMarker;
     this.mode = mode;
     this.ui = ui;
+    this.spinnerWord = spinnerWord ?? pickSpinnerWord();
     this.textComponent = new Text(this.styled(text), 0, 0);
     if (mode === 'live') {
       this.startSpinner();
@@ -111,7 +115,7 @@ export class ThinkingComponent implements Component {
       );
       rendered = [
         '',
-        spinner + currentTheme.fg('textDim', 'thinking...'),
+        spinner + currentTheme.fg('textDim', `${this.spinnerWord}...`),
         ...visibleLines.map((line) => MESSAGE_INDENT + line),
       ];
     } else {

@@ -137,8 +137,9 @@ export function renderDanceFooterModel(modelLabel: string): string {
 /**
  * Drives the rainbow: a single timer advances a shared `phase` and asks the UI
  * to repaint. Lives independently of any component, so the welcome banner
- * scrolling away or being rebuilt never disturbs the animation. Three states:
- * off (default), flowing, and a frozen static rainbow.
+ * scrolling away or being rebuilt never disturbs the animation. Two states:
+ * off (default) and flowing; a one-off dance flows briefly then returns to
+ * off, while `/dance on` flows indefinitely.
  */
 export class RainbowDance implements RainbowDanceController {
   private currentPhase = 0;
@@ -160,9 +161,11 @@ export class RainbowDance implements RainbowDanceController {
   }
 
   /**
-   * Flow the rainbow for `DANCE_FLOW_MS`, then settle:
-   *  - `hold: false` → fade back to the default (uncolored) banner.
-   *  - `hold: true`  → freeze into a static rainbow that stays on.
+   * Flow the rainbow.
+   *  - `hold: false` → flow for `DANCE_FLOW_MS`, then fade back to the
+   *    default (uncolored) banner.
+   *  - `hold: true`  → flow forever; the animation never settles. Only
+   *    `stop()` (i.e. `/dance off`) or `dispose()` ends it.
    */
   start(opts: { hold: boolean }): void {
     this.clearTimers();
@@ -173,9 +176,11 @@ export class RainbowDance implements RainbowDanceController {
       this.currentPhase += 1;
       this.requestRender();
     }, DANCE_FRAME_MS);
-    this.flowStopTimer = setTimeout(() => {
-      this.settle(opts.hold);
-    }, DANCE_FLOW_MS);
+    if (!opts.hold) {
+      this.flowStopTimer = setTimeout(() => {
+        this.settle();
+      }, DANCE_FLOW_MS);
+    }
     this.requestRender();
   }
 
@@ -195,13 +200,11 @@ export class RainbowDance implements RainbowDanceController {
     this.clearTimers();
   }
 
-  /** End the flow: freeze the rainbow (hold) or fade back to default. */
-  private settle(hold: boolean): void {
+  /** End a one-off flow: fade back to the default colors. */
+  private settle(): void {
     this.clearTimers();
-    if (!hold) {
-      this.isColored = false;
-      this.currentPhase = 0;
-    }
+    this.isColored = false;
+    this.currentPhase = 0;
     this.requestRender();
   }
 
@@ -220,7 +223,7 @@ export class RainbowDance implements RainbowDanceController {
 /**
  * Handle `/dance`:
  *   /dance       flow for a few seconds, then fade back to the default colors
- *   /dance on    flow, then freeze into a static rainbow that stays on
+ *   /dance on    flow forever — the animation runs until turned off
  *   /dance off   turn the rainbow off
  *
  * Returns true when it claimed the input.
