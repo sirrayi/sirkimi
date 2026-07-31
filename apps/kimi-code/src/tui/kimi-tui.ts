@@ -1404,6 +1404,10 @@ export class KimiTUI {
     this.streamingUI.resetToolUi();
     this.streamingUI.resetToolCallState();
 
+    // A prompt is starting — refresh quota/token readouts now so the footer
+    // reflects the new turn immediately instead of waiting for turn end.
+    this.refreshQuota();
+
     this.patchLivePane({
       mode: 'waiting',
       pendingApproval: null,
