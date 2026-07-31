@@ -68,6 +68,6 @@ jobs:
         with:
           name: sirkimi ${{ github.ref_name }}
           files: |
-            dist/kimi-code-*.zip
-            dist/kimi-code-*.zip.sha256
+            dist/sirkimi-*.zip
+            dist/sirkimi-*.zip.sha256
           generate_release_notes: true

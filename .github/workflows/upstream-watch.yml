@@ -1,0 +1,67 @@
+name: upstream-watch
+
+# Weekly check (plus manual trigger) for new upstream commits. When
+# MoonshotAI/kimi-code main has moved past the recorded sync point, open (or
+# bump) an issue so the fork gets merged instead of silently aging.
+
+on:
+  schedule:
+    - cron: '17 9 * * 1' # Mondays 09:17 UTC
+  workflow_dispatch:
+
+permissions:
+  issues: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch upstream and local main
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          repository: MoonshotAI/kimi-code
+          path: upstream
+
+      - name: Compare against recorded sync point
+        id: diff
+        shell: bash
+        run: |
+          SYNC_FILE=".github/UPSTREAM_SYNC"
+          recorded=""
+          if [ -f "$SYNC_FILE" ]; then recorded=$(cut -d' ' -f1 "$SYNC_FILE"); fi
+          upstream_head=$(git -C upstream rev-parse origin/main)
+          echo "recorded=$recorded"
+          echo "upstream_head=$upstream_head"
+          if [ "$recorded" = "$upstream_head" ]; then
+            echo "behind=no" >> "$GITHUB_OUTPUT"
+          else
+            if [ -n "$recorded" ] && git -C upstream merge-base --is-ancestor "$recorded" "$upstream_head" 2>/dev/null; then
+              count=$(git -C upstream rev-list --count "$recorded".."$upstream_head")
+            else
+              count="unknown"
+            fi
+            echo "behind=yes" >> "$GITHUB_OUTPUT"
+            echo "count=$count" >> "$GITHUB_OUTPUT"
+            echo "head=$upstream_head" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Record sync point
+        if: steps.diff.outputs.behind == 'no'
+        shell: bash
+        run: git -C upstream rev-parse origin/main > .github/UPSTREAM_SYNC
+
+      - name: Open an issue when upstream moved ahead
+        if: steps.diff.outputs.behind == 'yes'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COUNT: ${{ steps.diff.outputs.count }}
+          HEAD: ${{ steps.diff.outputs.head }}
+        run: |
+          existing=$(gh issue list --state open --label upstream-sync --json number --jq '.[0].number' || true)
+          body="Upstream MoonshotAI/kimi-code main is ahead of the recorded sync point by ${COUNT} commit(s) (head: ${HEAD}). Merge upstream/main into sirkimi, run the full test suite, then update .github/UPSTREAM_SYNC."
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body "$body"
+          else
+            gh issue create --title "Upstream sync pending" --label upstream-sync --body "$body"
+          fi

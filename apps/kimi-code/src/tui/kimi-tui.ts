@@ -35,6 +35,13 @@ import { quoteShellArg } from '#/utils/shell-quote';
 import { restoreTerminalModes } from '#/utils/terminal-restore';
 
 import { BannerProvider } from './banner/banner-provider';
+import {
+  loadTokenUsageStore,
+  recordSessionUsage,
+  saveTokenUsageStore,
+  summarizeTokenUsage,
+  tokenUsageWindowLabel,
+} from './utils/token-usage';
 import { readBannerDisplayState, writeBannerDisplayState } from './banner/state';
 import {
   BUILTIN_SLASH_COMMANDS,
@@ -239,6 +246,7 @@ function createInitialAppState(input: KimiTUIStartupInput): AppState {
     notifications: input.tuiConfig.notifications,
     upgrade: input.tuiConfig.upgrade,
     statusLine: input.tuiConfig.statusLine,
+    tokenUsage: input.tuiConfig.tokenUsage,
     availableModels: {},
     availableProviders: {},
     sessionTitle: null,
@@ -1020,6 +1028,45 @@ export class KimiTUI {
   /** Refetch the plan quota and push it into the footer. Fire-and-forget. */
   refreshQuota(): void {
     void this.fetchQuota();
+    void this.fetchTokenUsage();
+  }
+
+  /**
+   * Refresh the bottom-left token usage readout from the session's
+   * cumulative totals, folded into the configured window (session, day,
+   * week, month, forever) via the local daily-bucket store. Off hides it.
+   */
+  private async fetchTokenUsage(): Promise<void> {
+    const window = this.state.appState.tokenUsage ?? 'session';
+    if (window === 'off' || this.session === undefined) {
+      this.state.footer.setTokenUsage(null);
+      return;
+    }
+    try {
+      const usage = await this.session.getUsage();
+      const total = usage.total;
+      if (total === undefined) {
+        this.state.footer.setTokenUsage(null);
+        return;
+      }
+      const totals = {
+        input: total.inputOther + total.inputCacheRead + total.inputCacheCreation,
+        output: total.output,
+      };
+      const sessionId = this.state.appState.sessionId || 'unknown';
+      const store = await loadTokenUsageStore();
+      recordSessionUsage(store, sessionId, totals);
+      await saveTokenUsageStore(store);
+      const stats = summarizeTokenUsage(store, window, totals);
+      this.state.footer.setTokenUsage({
+        input: stats.input,
+        output: stats.output,
+        label: tokenUsageWindowLabel(window),
+      });
+      this.state.ui.requestRender();
+    } catch {
+      this.state.footer.setTokenUsage(null);
+    }
   }
 
   private async fetchQuota(): Promise<void> {

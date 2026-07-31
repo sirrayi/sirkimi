@@ -343,3 +343,43 @@ describe('FooterComponent quota readout', () => {
     expect(plain(zeroLimit.render(120)[1]!)).not.toContain('week:');
   });
 });
+
+describe('FooterComponent token usage readout', () => {
+  it('renders token usage at the bottom-left with quota/context on the right', () => {
+    const footer = new FooterComponent({ ...baseState });
+    footer.setQuota({ weekly: { used: 40, limit: 1000 } });
+    footer.setTokenUsage({ input: 12300, output: 1400, label: '' });
+
+    const line2 = plain(footer.render(120)[1]!);
+    expect(line2).toContain('in:');
+    expect(line2).toContain('out:');
+    expect(line2.indexOf('in:')).toBeLessThan(line2.indexOf('week:'));
+  });
+
+  it('shows the window label for non-session windows', () => {
+    const footer = new FooterComponent({ ...baseState });
+    footer.setTokenUsage({ input: 100, output: 10, label: 'today' });
+
+    expect(plain(footer.render(120)[1]!)).toContain('· today');
+  });
+
+  it('keeps a second line for token usage when tips = false', () => {
+    const state: AppState = {
+      ...baseState,
+      statusLine: { items: null, command: null, tips: false },
+    };
+    const footer = new FooterComponent(state);
+    footer.setTokenUsage({ input: 100, output: 10, label: '' });
+
+    const lines = footer.render(200).map(plain);
+    expect(lines).toHaveLength(2);
+    expect(lines[0]).toContain('context:');
+    expect(lines[1]).toContain('in:');
+    expect(lines[1]).not.toContain('context:');
+  });
+
+  it('hides the readout when unset', () => {
+    const footer = new FooterComponent({ ...baseState });
+    expect(plain(footer.render(120)[1]!)).not.toContain('in:');
+  });
+});

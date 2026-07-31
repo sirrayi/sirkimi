@@ -44,7 +44,7 @@ else
 fi
 [ "$tag" != "" ] || fail "no release found for $REPO"
 
-asset="kimi-code-${target}.zip"
+asset="sirkimi-${target}.zip"
 base="https://github.com/$REPO/releases/download/$tag"
 tmpdir=$(mktemp -d)
 trap 'rm -rf "$tmpdir"' EXIT

@@ -61,6 +61,8 @@ export const TuiConfigFileSchema = z.object({
   disable_paste_burst: z.boolean().optional(),
   /** true starts the rainbow dance animation at launch and keeps it flowing. */
   dance: z.boolean().optional(),
+  /** Token usage readout window in the footer; default "session". */
+  token_usage: z.enum(['session', 'day', 'week', 'month', 'forever', 'off']).optional(),
   editor: z
     .object({
       command: z.string().optional(),
@@ -85,6 +87,8 @@ export const TuiConfigSchema = z.object({
   disablePasteBurst: z.boolean(),
   /** Rainbow dance animation on at launch; absent means off. */
   dance: z.boolean().optional(),
+  /** Token usage readout window; absent means "session". */
+  tokenUsage: z.enum(['session', 'day', 'week', 'month', 'forever', 'off']).optional(),
   editorCommand: z.string().nullable(),
   notifications: NotificationsConfigSchema,
   upgrade: UpgradePreferencesSchema,
@@ -199,6 +203,11 @@ export function normalizeTuiConfig(
     // Only materialize the opt-in; undefined means off and keeps older
     // fixtures/snapshots without the key comparing equal.
     dance: config.dance === true ? true : undefined,
+    // Only materialize non-default windows; undefined means "session".
+    tokenUsage:
+      config.token_usage === undefined || config.token_usage === 'session'
+        ? undefined
+        : config.token_usage,
     editorCommand: command === undefined || command.length === 0 ? null : command,
     notifications: {
       enabled: config.notifications?.enabled ?? DEFAULT_NOTIFICATIONS_CONFIG.enabled,
@@ -256,6 +265,7 @@ export function renderTuiConfig(config: TuiConfig): string {
 theme = "${escapeTomlBasicString(config.theme)}" # "auto" | "dark" | "light" | custom theme name
 disable_paste_burst = ${String(config.disablePasteBurst)} # true disables non-bracketed paste-burst fallback
 dance = ${String(config.dance === true)} # true starts the rainbow dance animation at launch
+token_usage = "${config.tokenUsage ?? 'session'}" # "session" | "day" | "week" | "month" | "forever" | "off"
 
 [editor]
 command = "${escapeTomlBasicString(config.editorCommand ?? '')}" # Empty uses $VISUAL / $EDITOR

@@ -53,6 +53,7 @@ export async function applyReloadedTuiConfig(
     notifications: config.notifications,
     upgrade: config.upgrade,
     statusLine: config.statusLine,
+    tokenUsage: config.tokenUsage,
   });
   host.state.editor.setDisablePasteBurst(config.disablePasteBurst);
 }

@@ -34,7 +34,15 @@ import { handleUpgrade } from './cli/sub/upgrade';
 import { createCliTelemetryBootstrap, initializeCliTelemetry } from './cli/telemetry';
 import { runUpdatePreflight } from './cli/update/preflight';
 import { createKimiCodeHostIdentity, getVersion } from './cli/version';
-import { CLI_SHUTDOWN_TIMEOUT_MS, CLI_UI_MODE, PROCESS_NAME } from './constant/app';
+import {
+  CLI_SHUTDOWN_TIMEOUT_MS,
+  CLI_UI_MODE,
+  FORK_INSTALL_URL,
+  FORK_NAME,
+  FORK_SELF_UPDATE_DISABLED,
+  FORK_UPSTREAM_BASE_VERSION,
+  PROCESS_NAME,
+} from './constant/app';
 import { cleanupStaleNativeCacheForCurrent } from './native/native-assets';
 import { installNativeModuleHook } from './native/module-hook';
 import { runNativeAssetSmokeIfRequested } from './native/smoke';
@@ -66,10 +74,15 @@ export async function handleMainCommand(
     throw error;
   }
 
-  const preflightResult = await runUpdatePreflight(
-    version,
-    validated.uiMode === 'print' ? { track, isTTY: false } : { track },
-  );
+  // sirkimi fork: updates ship via GitHub Releases + install.sh. Never run
+  // the upstream CDN/npm self-update preflight — it could replace the fork
+  // with the stock build. See FORK_SELF_UPDATE_DISABLED in constant/app.
+  const preflightResult = FORK_SELF_UPDATE_DISABLED
+    ? 'continue'
+    : await runUpdatePreflight(
+        version,
+        validated.uiMode === 'print' ? { track, isTTY: false } : { track },
+      );
   if (preflightResult === 'exit') {
     process.exit(0);
   }
@@ -89,6 +102,16 @@ async function handleMigrateCommand(version: string): Promise<void> {
 }
 
 export async function handleUpgradeCommand(version: string): Promise<void> {
+  // sirkimi fork: self-updating from the upstream CDN/npm would replace the
+  // fork with the stock build. Fork updates ship via GitHub Releases.
+  if (FORK_SELF_UPDATE_DISABLED) {
+    process.stdout.write(
+      `sirkimi ${version} does not self-update from the upstream CDN.\n` +
+        `Update with: curl -fsSL ${FORK_INSTALL_URL} | sh\n`,
+    );
+    process.exit(0);
+  }
+
   const telemetryBootstrap = createCliTelemetryBootstrap();
   const telemetryClient: TelemetryClient = {
     track,
@@ -154,9 +177,12 @@ export function main(): void {
   });
 
   const version = getVersion();
+  // Fork-branded display: `sirkimi 1.0.1 (kimi-code 0.31.1)`. The raw version
+  // is still what telemetry and the host identity report.
+  const displayVersion = `${FORK_NAME} ${version} (kimi-code ${FORK_UPSTREAM_BASE_VERSION})`;
 
   const program = createProgram(
-    version,
+    displayVersion,
     (opts) => {
       void handleMainCommand(opts, version)
         .then(async (outcome) => {

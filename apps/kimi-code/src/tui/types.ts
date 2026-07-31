@@ -12,6 +12,7 @@ import type {
 import type { NotificationsConfig, StatusLineConfig, UpgradePreferences } from './config';
 import type { PendingApproval, PendingQuestion } from './reverse-rpc/types';
 import type { ColorToken, ThemeName } from './theme';
+import type { TokenUsageWindow } from './utils/token-usage';
 
 export type BannerDisplay = 'always' | 'once' | 'cooldown';
 
@@ -54,6 +55,8 @@ export interface AppState {
   upgrade: UpgradePreferences;
   /** Footer status line customization from tui.toml; absent means the default layout. */
   statusLine?: StatusLineConfig;
+  /** Token usage readout window from tui.toml; absent means "session". */
+  tokenUsage?: TokenUsageWindow;
   availableModels: Record<string, ModelAlias>;
   availableProviders: Record<string, ProviderConfig>;
   sessionTitle: string | null;

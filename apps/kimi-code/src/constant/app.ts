@@ -1,8 +1,19 @@
 import { ErrorCodes } from '@moonshot-ai/kimi-code-sdk';
 
 export const PRODUCT_NAME = 'Kimi Code';
-export const CLI_COMMAND_NAME = 'kimi';
+export const CLI_COMMAND_NAME = 'skimi';
 export const PROCESS_NAME = 'kimi-code';
+
+// ── sirkimi fork identity ─────────────────────────────────────────────
+// This build is the sirkimi fork (github.com/sirrayi/sirkimi), not the
+// upstream CLI. Its releases ship via GitHub Releases + install.sh, so the
+// upstream self-update path (CDN/npm) must never run: it would replace the
+// fork with the stock build.
+export const FORK_NAME = 'sirkimi';
+export const FORK_UPSTREAM_BASE_VERSION = '0.31.1';
+export const FORK_INSTALL_URL =
+  'https://raw.githubusercontent.com/sirrayi/sirkimi/main/install.sh';
+export const FORK_SELF_UPDATE_DISABLED = true;
 
 // Used in telemetry app names and HTTP User-Agent headers.
 export const CLI_USER_AGENT_PRODUCT = 'kimi-code-cli';

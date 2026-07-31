@@ -212,6 +212,8 @@ export class FooterComponent implements Component {
     fiveHour?: { used: number; limit: number };
     weekly?: { used: number; limit: number };
   } | null = null;
+  /** Token usage snapshot for the bottom-left readout; null hides it. */
+  private tokenUsage: { input: number; output: number; label: string } | null = null;
 
   constructor(state: AppState, onRefresh: () => void = () => {}) {
     this.state = state;
@@ -288,6 +290,14 @@ export class FooterComponent implements Component {
     this.quota = quota;
   }
 
+  /**
+   * Token usage snapshot rendered at the bottom-left of line 2,
+   * e.g. `in: 12.3k · out: 1.4k · today`. Pass null to hide.
+   */
+  setTokenUsage(usage: { input: number; output: number; label: string } | null): void {
+    this.tokenUsage = usage;
+  }
+
   invalidate(): void {}
 
   render(width: number): string[] {
@@ -320,6 +330,13 @@ export class FooterComponent implements Component {
     const rightText =
       quotaParts.length > 0 ? `${quotaParts.join(' · ')} · ${contextText}` : contextText;
     const rightWidth = visibleWidth(rightText);
+
+    // Bottom-left readout: token usage for the configured window.
+    const tu = this.tokenUsage;
+    const tokenText =
+      tu !== null
+        ? `in: ${formatTokenCount(tu.input)} · out: ${formatTokenCount(tu.output)}${tu.label.length > 0 ? ` · ${tu.label}` : ''}`
+        : '';
 
     // With tips disabled, line 1's right slot is free — park the quota/context
     // readout there and drop the second footer line entirely.
@@ -374,14 +391,20 @@ export class FooterComponent implements Component {
     }
 
     // Status readout moved up: the footer collapses to one line unless a
-    // transient hint needs the second row.
-    if (statusOnLine1 && !this.transientHint) {
+    // transient hint or the token usage readout needs the second row.
+    if (statusOnLine1 && !this.transientHint && tokenText.length === 0) {
       return [truncateToWidth(line1, width)];
     }
 
-    // ── Line 2: transient hint (bottom-left) + quota + context (right) ──
+    // ── Line 2: transient hint or token usage (left) + quota + context (right) ──
     const line2Right = statusOnLine1 ? '' : rightText;
     const line2RightWidth = visibleWidth(line2Right);
+    const line2Left = this.transientHint
+      ? null
+      : tokenText.length > 0
+        ? chalk.hex(colors.textDim)(tokenText)
+        : null;
+    const line2LeftWidth = line2Left !== null ? visibleWidth(tokenText) : 0;
     let line2: string;
     if (this.transientHint) {
       const maxHintWidth = Math.max(0, width - line2RightWidth - 1);
@@ -395,6 +418,9 @@ export class FooterComponent implements Component {
         chalk.hex(colors.warning).bold(shownHint) +
         ' '.repeat(pad) +
         chalk.hex(colors.text)(line2Right);
+    } else if (line2Left !== null) {
+      const pad = Math.max(1, width - line2LeftWidth - line2RightWidth);
+      line2 = line2Left + ' '.repeat(pad) + chalk.hex(colors.text)(line2Right);
     } else {
       const leftPad = Math.max(0, width - line2RightWidth);
       line2 = ' '.repeat(leftPad) + chalk.hex(colors.text)(line2Right);
