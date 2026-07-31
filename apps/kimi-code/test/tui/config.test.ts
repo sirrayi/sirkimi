@@ -94,6 +94,21 @@ tips = false
     expect(config.statusLine?.tips ?? true).toBe(true);
   });
 
+  it('parses dance = true and round-trips it', async () => {
+    const config = parseTuiConfig(`dance = true`);
+
+    expect(config.dance).toBe(true);
+
+    await saveTuiConfig(config, filePath);
+    expect((await loadTuiConfig(filePath)).dance).toBe(true);
+  });
+
+  it('defaults dance to off when omitted', () => {
+    const config = parseTuiConfig(`theme = "dark"`);
+
+    expect(config.dance ?? false).toBe(false);
+  });
+
   it('normalizes an empty editor command to auto-detect', () => {
     const config = parseTuiConfig(`
 [editor]

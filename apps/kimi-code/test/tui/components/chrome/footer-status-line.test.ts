@@ -262,38 +262,84 @@ describe('StatusLineCommandRunner', () => {
 });
 
 describe('FooterComponent tips toggle', () => {
-  it('hides the rotating tips when status_line tips = false', () => {
+  it('moves the quota/context readout onto line 1 when tips = false', () => {
     const state: AppState = {
       ...baseState,
       statusLine: { items: null, command: null, tips: false },
     };
-    const line1 = plain(new FooterComponent(state).render(200)[0]!);
+    const footer = new FooterComponent(state);
+    footer.setQuota({ weekly: { used: 40, limit: 1000 } });
 
-    expect(line1.trimEnd()).toMatch(/kimi-k2 {2}\/tmp\/project$/);
+    const lines = footer.render(200).map(plain);
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toContain('kimi-k2');
+    expect(lines[0]).toContain('/tmp/project');
+    expect(lines[0]).toContain('week: 4%');
+    expect(lines[0]).toContain('context:');
+    expect(lines[0]!.indexOf('kimi-k2')).toBeLessThan(lines[0]!.indexOf('week:'));
+  });
+
+  it('collapses to a single line even without a quota when tips = false', () => {
+    const state: AppState = {
+      ...baseState,
+      statusLine: { items: null, command: null, tips: false },
+    };
+    const lines = new FooterComponent(state).render(200).map(plain);
+
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toContain('context:');
+  });
+
+  it('keeps a second line for the transient hint when tips = false', () => {
+    const state: AppState = {
+      ...baseState,
+      statusLine: { items: null, command: null, tips: false },
+    };
+    const footer = new FooterComponent(state);
+    footer.setTransientHint('Press Ctrl+C again to exit');
+
+    const lines = footer.render(200).map(plain);
+    expect(lines).toHaveLength(2);
+    expect(lines[1]).toContain('Press Ctrl+C again to exit');
+    expect(lines[1]).not.toContain('context:');
   });
 });
 
 describe('FooterComponent quota readout', () => {
-  it('renders the quota beside the context readout when set', () => {
+  it('renders both quota windows beside the context readout when set', () => {
     const footer = new FooterComponent({
       ...baseState,
       contextTokens: 100,
       maxContextTokens: 1000,
     });
-    footer.setQuota({ used: 40, limit: 1000 });
+    footer.setQuota({
+      fiveHour: { used: 6, limit: 50 },
+      weekly: { used: 40, limit: 1000 },
+    });
 
     const line2 = plain(footer.render(120)[1]!);
-    expect(line2).toContain('quota: 4% (40/1000)');
+    expect(line2).toContain('5h: 12%');
+    expect(line2).toContain('week: 4%');
     expect(line2).toContain('context: 10%');
-    expect(line2.indexOf('quota:')).toBeLessThan(line2.indexOf('context:'));
+    expect(line2.indexOf('5h:')).toBeLessThan(line2.indexOf('week:'));
+    expect(line2.indexOf('week:')).toBeLessThan(line2.indexOf('context:'));
+  });
+
+  it('renders only the windows that are known', () => {
+    const footer = new FooterComponent({ ...baseState });
+    footer.setQuota({ weekly: { used: 40, limit: 1000 } });
+
+    const line2 = plain(footer.render(120)[1]!);
+    expect(line2).not.toContain('5h:');
+    expect(line2).toContain('week: 4%');
   });
 
   it('omits the quota when unset or zero-limit', () => {
     const unset = new FooterComponent({ ...baseState });
-    expect(plain(unset.render(120)[1]!)).not.toContain('quota:');
+    expect(plain(unset.render(120)[1]!)).not.toContain('week:');
 
     const zeroLimit = new FooterComponent({ ...baseState });
-    zeroLimit.setQuota({ used: 0, limit: 0 });
-    expect(plain(zeroLimit.render(120)[1]!)).not.toContain('quota:');
+    zeroLimit.setQuota({ fiveHour: { used: 0, limit: 0 }, weekly: { used: 0, limit: 0 } });
+    expect(plain(zeroLimit.render(120)[1]!)).not.toContain('week:');
   });
 });

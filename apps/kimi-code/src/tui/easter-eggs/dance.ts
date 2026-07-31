@@ -105,6 +105,11 @@ export function getRainbowDanceView(): RainbowDanceView | undefined {
   return currentDanceView;
 }
 
+/** The installed controller, if any — for config-driven startup. */
+export function getRainbowDanceController(): RainbowDanceController | undefined {
+  return currentDanceController;
+}
+
 export function isRainbowDancing(): boolean {
   return currentDanceView?.colored === true;
 }

@@ -112,7 +112,7 @@ import { SessionEventHandler } from './controllers/session-event-handler';
 import { SessionReplayRenderer } from './controllers/session-replay';
 import { StreamingUIController } from './controllers/streaming-ui';
 import { TasksBrowserController } from './controllers/tasks-browser';
-import { installRainbowDance } from './easter-eggs/dance';
+import { getRainbowDanceController, installRainbowDance } from './easter-eggs/dance';
 import { adaptPanelResponse } from './reverse-rpc/approval/adapter';
 import { ApprovalController } from './reverse-rpc/approval/controller';
 import { createApprovalRequestHandler } from './reverse-rpc/approval/handler';
@@ -409,6 +409,10 @@ export class KimiTUI {
     this.uninstallRainbowDance = installRainbowDance(() => {
       this.state.ui.requestRender();
     });
+    // tui.toml `dance = true`: flow the rainbow from launch until /dance off.
+    if (startupInput.tuiConfig.dance === true) {
+      getRainbowDanceController()?.start({ hold: true });
+    }
 
     this.reverseRpcDisposers.push(
       ...registerReverseRPCHandlers(this.approvalController, this.questionController, {
@@ -1005,37 +1009,57 @@ export class KimiTUI {
   }
 
   /**
-   * Polls the managed-platform usage endpoint and feeds the weekly plan
-   * quota into the footer's line-2 readout (`quota: N% (used/limit)` next
-   * to the context percentage). Silent on any failure — unmanaged
-   * providers, network errors, and auth lapses just hide the readout.
+   * Polls the managed-platform usage endpoint and feeds the plan quota
+   * (5-hour and weekly windows) into the footer's readout next to the
+   * context percentage. Silent on any failure — unmanaged providers,
+   * network errors, and auth lapses just hide the readout.
    */
   private static readonly QUOTA_POLL_INTERVAL_MS = 300_000;
   private quotaPollTimer: ReturnType<typeof setInterval> | null = null;
 
-  private startQuotaPolling(): void {
-    const refresh = async (): Promise<void> => {
-      try {
-        const appState = this.state.appState;
-        const providerKey = appState.availableModels[appState.model]?.provider;
-        if (!isManagedUsageProvider(providerKey)) {
-          this.state.footer.setQuota(null);
-          return;
-        }
-        const res = await this.harness.auth.getManagedUsage(providerKey);
-        if (res.kind === 'ok' && res.summary !== null && res.summary.limit > 0) {
-          this.state.footer.setQuota({ used: res.summary.used, limit: res.summary.limit });
-        } else {
-          this.state.footer.setQuota(null);
-        }
-        this.state.ui.requestRender();
-      } catch {
+  /** Refetch the plan quota and push it into the footer. Fire-and-forget. */
+  refreshQuota(): void {
+    void this.fetchQuota();
+  }
+
+  private async fetchQuota(): Promise<void> {
+    try {
+      const appState = this.state.appState;
+      const providerKey = appState.availableModels[appState.model]?.provider;
+      if (!isManagedUsageProvider(providerKey)) {
         this.state.footer.setQuota(null);
+        return;
       }
-    };
-    void refresh();
+      const res = await this.harness.auth.getManagedUsage(providerKey);
+      if (res.kind !== 'ok') {
+        this.state.footer.setQuota(null);
+        this.state.ui.requestRender();
+        return;
+      }
+      const weekly =
+        res.summary !== null && res.summary.limit > 0
+          ? { used: res.summary.used, limit: res.summary.limit }
+          : undefined;
+      const fiveHourRow =
+        res.limits.find((row) => row.window?.unit === 'hour' && row.window.duration === 5) ??
+        res.limits[0];
+      const fiveHour =
+        fiveHourRow !== undefined && fiveHourRow.limit > 0
+          ? { used: fiveHourRow.used, limit: fiveHourRow.limit }
+          : undefined;
+      this.state.footer.setQuota(
+        fiveHour === undefined && weekly === undefined ? null : { fiveHour, weekly },
+      );
+      this.state.ui.requestRender();
+    } catch {
+      this.state.footer.setQuota(null);
+    }
+  }
+
+  private startQuotaPolling(): void {
+    this.refreshQuota();
     this.quotaPollTimer = setInterval(() => {
-      void refresh();
+      this.refreshQuota();
     }, KimiTUI.QUOTA_POLL_INTERVAL_MS);
     this.quotaPollTimer.unref?.();
   }
@@ -1765,7 +1789,14 @@ export class KimiTUI {
 
   updateTerminalTitle(): void {
     const trimmed = this.state.appState.sessionTitle?.trim() ?? '';
-    const label = trimmed.length > 0 ? trimmed.slice(0, MAX_TERMINAL_TITLE_LENGTH) : PRODUCT_NAME;
+    const sessionId = this.state.appState.sessionId;
+    // Claude Code-style tab label: session name plus a short identifier, so
+    // multiple windows are distinguishable at a glance.
+    const idSuffix = sessionId.length > 0 ? ` · ${sessionId.slice(0, 8)}` : '';
+    const label =
+      trimmed.length > 0
+        ? `${trimmed}${idSuffix}`.slice(0, MAX_TERMINAL_TITLE_LENGTH)
+        : PRODUCT_NAME;
     this.state.terminal.setTitle(label);
   }
 

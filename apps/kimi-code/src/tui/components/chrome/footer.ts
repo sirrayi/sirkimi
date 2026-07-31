@@ -208,7 +208,10 @@ export class FooterComponent implements Component {
   private backgroundBashTaskCount = 0;
   private backgroundAgentCount = 0;
   /** Plan quota snapshot for the footer readout; null hides it. */
-  private quota: { used: number; limit: number } | null = null;
+  private quota: {
+    fiveHour?: { used: number; limit: number };
+    weekly?: { used: number; limit: number };
+  } | null = null;
 
   constructor(state: AppState, onRefresh: () => void = () => {}) {
     this.state = state;
@@ -271,11 +274,17 @@ export class FooterComponent implements Component {
   }
 
   /**
-   * Plan quota snapshot rendered beside the context readout on line 2,
-   * e.g. `quota: 4% (40/1000)`. Pass null to hide (unmanaged provider or
-   * fetch failure).
+   * Plan quota snapshot rendered before the context readout,
+   * e.g. `5h: 12% · week: 4% · context: …`. Pass null to hide (unmanaged
+   * provider or fetch failure); each window renders only when its limit
+   * is known and positive.
    */
-  setQuota(quota: { used: number; limit: number } | null): void {
+  setQuota(
+    quota: {
+      fiveHour?: { used: number; limit: number };
+      weekly?: { used: number; limit: number };
+    } | null,
+  ): void {
     this.quota = quota;
   }
 
@@ -292,6 +301,29 @@ export class FooterComponent implements Component {
       this.statusLineRunner.maybeRefresh(this.statusLinePayload());
       customLine = this.statusLineRunner.current();
     }
+
+    // ── Right readout: quota windows (when known) + context ──
+    const contextText = formatContextStatus(
+      state.contextUsage,
+      state.contextTokens,
+      state.maxContextTokens,
+    );
+    const quotaParts: string[] = [];
+    const fiveHour = this.quota?.fiveHour;
+    if (fiveHour !== undefined && fiveHour.limit > 0) {
+      quotaParts.push(`5h: ${String(usagePercent(fiveHour.used, fiveHour.limit))}%`);
+    }
+    const weekly = this.quota?.weekly;
+    if (weekly !== undefined && weekly.limit > 0) {
+      quotaParts.push(`week: ${String(usagePercent(weekly.used, weekly.limit))}%`);
+    }
+    const rightText =
+      quotaParts.length > 0 ? `${quotaParts.join(' · ')} · ${contextText}` : contextText;
+    const rightWidth = visibleWidth(rightText);
+
+    // With tips disabled, line 1's right slot is free — park the quota/context
+    // readout there and drop the second footer line entirely.
+    let statusOnLine1 = false;
 
     if (customLine !== null) {
       // status_line.command: the first stdout line takes over line 1.
@@ -330,6 +362,10 @@ export class FooterComponent implements Component {
       if (tipText) {
         const pad = width - leftWidth - visibleWidth(tipText);
         line1 = leftLine + ' '.repeat(Math.max(0, pad)) + chalk.hex(colors.textMuted)(tipText);
+      } else if (!tipsEnabled && width - leftWidth - rightWidth >= 0) {
+        statusOnLine1 = true;
+        const pad = width - leftWidth - rightWidth;
+        line1 = leftLine + ' '.repeat(pad) + chalk.hex(colors.text)(rightText);
       } else if (leftWidth <= width) {
         line1 = leftLine;
       } else {
@@ -337,34 +373,31 @@ export class FooterComponent implements Component {
       }
     }
 
+    // Status readout moved up: the footer collapses to one line unless a
+    // transient hint needs the second row.
+    if (statusOnLine1 && !this.transientHint) {
+      return [truncateToWidth(line1, width)];
+    }
+
     // ── Line 2: transient hint (bottom-left) + quota + context (right) ──
-    const contextText = formatContextStatus(
-      state.contextUsage,
-      state.contextTokens,
-      state.maxContextTokens,
-    );
-    const quota = this.quota;
-    const rightText =
-      quota !== null && quota.limit > 0
-        ? `quota: ${String(usagePercent(quota.used, quota.limit))}% (${String(quota.used)}/${String(quota.limit)}) · ${contextText}`
-        : contextText;
-    const rightWidth = visibleWidth(rightText);
+    const line2Right = statusOnLine1 ? '' : rightText;
+    const line2RightWidth = visibleWidth(line2Right);
     let line2: string;
     if (this.transientHint) {
-      const maxHintWidth = Math.max(0, width - rightWidth - 1);
+      const maxHintWidth = Math.max(0, width - line2RightWidth - 1);
       const shownHint =
         visibleWidth(this.transientHint) <= maxHintWidth
           ? this.transientHint
           : truncateToWidth(this.transientHint, maxHintWidth, '…');
       const hintWidth = visibleWidth(shownHint);
-      const pad = Math.max(0, width - hintWidth - rightWidth);
+      const pad = Math.max(0, width - hintWidth - line2RightWidth);
       line2 =
         chalk.hex(colors.warning).bold(shownHint) +
         ' '.repeat(pad) +
-        chalk.hex(colors.text)(rightText);
+        chalk.hex(colors.text)(line2Right);
     } else {
-      const leftPad = Math.max(0, width - rightWidth);
-      line2 = ' '.repeat(leftPad) + chalk.hex(colors.text)(rightText);
+      const leftPad = Math.max(0, width - line2RightWidth);
+      line2 = ' '.repeat(leftPad) + chalk.hex(colors.text)(line2Right);
     }
 
     return [truncateToWidth(line1, width), truncateToWidth(line2, width)];
