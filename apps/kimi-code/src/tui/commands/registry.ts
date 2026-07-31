@@ -30,6 +30,20 @@ const ADD_DIR_ARG_COMPLETIONS: readonly ArgCompletionSpec[] = [
   { value: 'list', description: 'Show configured additional workspace directories' },
 ];
 
+const TOKENS_ARG_COMPLETIONS: readonly ArgCompletionSpec[] = [
+  { value: 'session', description: 'Current session totals (default)' },
+  { value: 'day', description: 'Today' },
+  { value: 'week', description: 'Rolling 7 days' },
+  { value: 'month', description: 'Rolling 30 days' },
+  { value: 'forever', description: 'Everything recorded' },
+  { value: 'off', description: 'Hide the readout' },
+];
+
+/** Argument autocompletion for the `/tokens` command. */
+export function tokensArgumentCompletions(argumentPrefix: string): AutocompleteItem[] | null {
+  return completeLeadingArg(TOKENS_ARG_COMPLETIONS, argumentPrefix);
+}
+
 /** Argument autocompletion for the `/goal` command (subcommands). */
 export function goalArgumentCompletions(argumentPrefix: string): AutocompleteItem[] | null {
   const nextMatch = argumentPrefix.match(/^next\s+(\S*)$/i);
@@ -331,6 +345,15 @@ export const BUILTIN_SLASH_COMMANDS = [
     aliases: [],
     description: 'Show session tokens + context window + plan quotas',
     priority: 60,
+    availability: 'always',
+  },
+  {
+    name: 'tokens',
+    aliases: [],
+    description: 'Set the footer token usage window (session/day/week/month/forever/off)',
+    priority: 60,
+    argumentHint: '[session|day|week|month|forever|off]',
+    completeArgs: tokensArgumentCompletions,
     availability: 'always',
   },
   {

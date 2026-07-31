@@ -59,6 +59,9 @@ function currentTuiConfig(host: SlashCommandHost): TuiConfig {
     disablePasteBurst: host.state.appState.disablePasteBurst ?? DEFAULT_TUI_CONFIG.disablePasteBurst,
     notifications: host.state.appState.notifications,
     upgrade: host.state.appState.upgrade,
+    statusLine: host.state.appState.statusLine,
+    tokenUsage: host.state.appState.tokenUsage,
+    dance: host.state.appState.dance,
   };
 }
 
@@ -910,4 +913,45 @@ function handleSettingsSelection(host: SlashCommandHost, value: SettingsSelectio
     case 'upgrade': showUpdatePreferencePicker(host); return;
     case 'usage': void showUsage(host); return;
   }
+}
+
+const TOKEN_USAGE_CHOICES = ['session', 'day', 'week', 'month', 'forever', 'off'] as const;
+type TokenUsageChoice = (typeof TOKEN_USAGE_CHOICES)[number];
+
+/**
+ * `/tokens [session|day|week|month|forever|off]` — configure the footer's
+ * bottom-left token usage readout. No argument shows the current window.
+ * Persists to tui.toml (`token_usage`) and refreshes the readout at once.
+ */
+export async function handleTokensCommand(host: SlashCommandHost, args: string): Promise<void> {
+  const arg = args.trim().toLowerCase();
+  const current = host.state.appState.tokenUsage ?? 'session';
+  if (arg.length === 0) {
+    host.showStatus(
+      `Token usage window: ${current}. Options: ${TOKEN_USAGE_CHOICES.join(' | ')} (e.g. /tokens day).`,
+    );
+    return;
+  }
+  if (!TOKEN_USAGE_CHOICES.includes(arg as TokenUsageChoice)) {
+    host.showError(`Unknown token usage window: ${arg}. Options: ${TOKEN_USAGE_CHOICES.join(' | ')}`);
+    return;
+  }
+
+  // "session" is the default; store it as absent so the config stays clean.
+  const tokenUsage = arg === 'session' ? undefined : (arg as TokenUsageChoice);
+  try {
+    await saveTuiConfig({
+      ...currentTuiConfig(host),
+      tokenUsage,
+    });
+  } catch (error) {
+    host.showStatus(`Failed to save token usage window: ${formatErrorMessage(error)}`, 'error');
+    return;
+  }
+
+  host.setAppState({ tokenUsage });
+  host.refreshQuota();
+  host.showStatus(
+    arg === 'off' ? 'Token usage readout hidden.' : `Token usage window set to "${arg}".`,
+  );
 }

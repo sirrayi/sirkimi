@@ -31,6 +31,7 @@ import {
   handlePlanCommand,
   handleSecondaryModelCommand,
   handleThemeCommand,
+  handleTokensCommand,
   handleYoloCommand,
   showExperimentsPanel,
   showModelPicker,
@@ -150,6 +151,8 @@ export interface SlashCommandHost {
   createNewSession(): Promise<void>;
   showSessionPicker(): Promise<void>;
   sendNormalUserInput(text: string): void;
+  /** Refresh the footer's quota/token readouts (fire-and-forget). */
+  refreshQuota(): void;
   sendSkillActivation(session: Session, skillName: string, skillArgs: string): void;
   activatePluginCommand(
     session: Session,
@@ -334,6 +337,9 @@ async function handleBuiltInSlashCommand(
       return;
     case 'title':
       await handleTitleCommand(host, args);
+      return;
+    case 'tokens':
+      await handleTokensCommand(host, args);
       return;
     case 'yolo':
       await handleYoloCommand(host, args);

@@ -57,6 +57,8 @@ export interface AppState {
   statusLine?: StatusLineConfig;
   /** Token usage readout window from tui.toml; absent means "session". */
   tokenUsage?: TokenUsageWindow;
+  /** Rainbow dance at launch from tui.toml; kept so CLI saves don't drop it. */
+  dance?: boolean;
   availableModels: Record<string, ModelAlias>;
   availableProviders: Record<string, ProviderConfig>;
   sessionTitle: string | null;

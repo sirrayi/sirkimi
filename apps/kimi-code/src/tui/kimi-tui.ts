@@ -248,6 +248,7 @@ function createInitialAppState(input: KimiTUIStartupInput): AppState {
     upgrade: input.tuiConfig.upgrade,
     statusLine: input.tuiConfig.statusLine,
     tokenUsage: input.tuiConfig.tokenUsage,
+    dance: input.tuiConfig.dance,
     availableModels: {},
     availableProviders: {},
     sessionTitle: null,
