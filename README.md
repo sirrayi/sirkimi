@@ -1,4 +1,22 @@
-# Kimi Code CLI
+# sirkimi
+
+A customized fork of [Kimi Code CLI](https://github.com/MoonshotAI/kimi-code) (MIT). The invoker is `skimi`.
+
+**What this fork adds on top of upstream:**
+
+- **Whimsical spinner verbs** — the thinking spinner picks a random verb per prompt ("canoodling...", "percolating...", ...), Claude Code style
+- **Plan quota in the footer** — `5h: N% · week: M%` next to the context readout, refreshed after every prompt
+- **Tips toggle** — `[status_line] tips = false` in `tui.toml` hides the rotating hints and collapses the footer to a single line
+- **Extended `/dance` easter egg** — `/dance` (one-off), `/dancing` (flows forever), `/dancea off|on` (freeze/resume the animation while keeping colors), `dance = true` in `tui.toml` to start it at launch
+- **Session-titled terminal tabs** — window title shows the session name plus a short session id
+
+**Versioning:** `MAJOR.SEMI.MINOR` — major for big changes, semi for feature-level updates, minor for fixes. First public release: **1.0.0**.
+
+**Install:** download the `skimi` binary for your platform from [Releases](https://github.com/sirrayi/sirkimi/releases), or build from source (`pnpm install && pnpm run build`, binary at `apps/kimi-code/dist/main.mjs`).
+
+---
+
+# Kimi Code CLI (upstream README)
 
 [![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE) [![Docs](https://img.shields.io/badge/docs-online-blue)](https://moonshotai.github.io/kimi-code/en/) <br>
 [Documentation](https://moonshotai.github.io/kimi-code/en/) · [Issues](https://github.com/MoonshotAI/kimi-code/issues) · [中文](README.zh-CN.md)

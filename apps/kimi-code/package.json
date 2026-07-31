@@ -1,17 +1,17 @@
 {
   "name": "@moonshot-ai/kimi-code",
-  "version": "0.31.1",
-  "description": "The Starting Point for Next-Gen Agents",
+  "version": "1.0.0",
+  "description": "sirkimi — a customized fork of Kimi Code CLI (github.com/sirrayi/sirkimi)",
   "license": "MIT",
   "author": "Moonshot AI",
-  "homepage": "https://github.com/MoonshotAI/kimi-code/tree/main/apps/kimi-code#readme",
+  "homepage": "https://github.com/sirrayi/sirkimi#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/MoonshotAI/kimi-code.git",
+    "url": "git+https://github.com/sirrayi/sirkimi.git",
     "directory": "apps/kimi-code"
   },
   "bugs": {
-    "url": "https://github.com/MoonshotAI/kimi-code/issues"
+    "url": "https://github.com/sirrayi/sirkimi/issues"
   },
   "keywords": [
     "kimi",
@@ -23,7 +23,7 @@
     "tui"
   ],
   "bin": {
-    "kimi": "dist/main.mjs"
+    "skimi": "dist/main.mjs"
   },
   "files": [
     "dist",

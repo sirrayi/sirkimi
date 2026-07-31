@@ -1,0 +1,73 @@
+name: sirkimi
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Typecheck + tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build workspace packages
+        run: pnpm run build:packages
+
+      - name: Typecheck
+        run: pnpm --filter @moonshot-ai/kimi-code run typecheck
+
+      - name: Test
+        run: pnpm --filter @moonshot-ai/kimi-code exec vitest run
+
+  native:
+    name: Native binaries
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: test
+    uses: ./.github/workflows/_native-build.yml
+    with:
+      upload-artifact-prefix: sirkimi-native
+      retention-days: 3
+
+  release:
+    name: GitHub Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: native
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download native artifacts
+        uses: actions/download-artifact@v7
+        with:
+          pattern: sirkimi-native-*
+          path: dist
+          merge-multiple: true
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: sirkimi ${{ github.ref_name }}
+          files: |
+            dist/kimi-code-*.zip
+            dist/kimi-code-*.zip.sha256
+          generate_release_notes: true
