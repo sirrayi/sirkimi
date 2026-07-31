@@ -120,6 +120,47 @@ describe('RainbowDance', () => {
     vi.advanceTimersByTime(DANCE_FRAME_MS * 5);
     expect(dance.phase).toBe(10);
   });
+
+  it('freeze stops the animation but keeps the static rainbow on', () => {
+    vi.useFakeTimers();
+    const dance = new RainbowDance(vi.fn());
+
+    dance.start({ hold: true });
+    vi.advanceTimersByTime(DANCE_FRAME_MS * 4);
+    dance.freeze();
+
+    expect(dance.colored).toBe(true);
+    const frozen = dance.phase;
+    expect(frozen).toBeGreaterThan(0);
+    vi.advanceTimersByTime(DANCE_FRAME_MS * 10);
+    expect(dance.phase).toBe(frozen);
+  });
+
+  it('resume restarts a frozen animation where it left off', () => {
+    vi.useFakeTimers();
+    const dance = new RainbowDance(vi.fn());
+
+    dance.start({ hold: true });
+    vi.advanceTimersByTime(DANCE_FRAME_MS * 4);
+    dance.freeze();
+    const frozen = dance.phase;
+
+    dance.resume();
+    vi.advanceTimersByTime(DANCE_FRAME_MS * 3);
+    expect(dance.colored).toBe(true);
+    expect(dance.phase).toBe(frozen + 3);
+  });
+
+  it('resume from off starts a perpetual flow', () => {
+    vi.useFakeTimers();
+    const dance = new RainbowDance(vi.fn());
+
+    dance.resume();
+    expect(dance.colored).toBe(true);
+    vi.advanceTimersByTime(DANCE_FLOW_MS + DANCE_FRAME_MS * 5);
+    expect(dance.colored).toBe(true);
+    expect(dance.phase).toBeGreaterThan(0);
+  });
 });
 
 describe('rainbowText', () => {
@@ -186,7 +227,7 @@ describe('installRainbowDance', () => {
 });
 
 interface DanceCall {
-  fn: 'start' | 'stop';
+  fn: 'start' | 'stop' | 'freeze' | 'resume';
   hold?: boolean;
 }
 
@@ -198,6 +239,8 @@ function makeHost(): { host: SlashCommandHost; calls: DanceCall[]; status: strin
     phase: 0,
     start: (opts: { hold: boolean }) => calls.push({ fn: 'start', hold: opts.hold }),
     stop: () => calls.push({ fn: 'stop' }),
+    freeze: () => calls.push({ fn: 'freeze' }),
+    resume: () => calls.push({ fn: 'resume' }),
     dispose: () => {},
   };
   setRainbowDance(rainbowDance);
@@ -221,12 +264,12 @@ describe('tryHandleDanceCommand', () => {
     setRainbowDance(undefined);
   });
 
-  it('claims /dance, flowing then fading, and hints at /dance on', () => {
+  it('claims /dance, flowing then fading, and hints at /dancing', () => {
     const handled = tryHandleDanceCommand(host, { name: 'dance', args: '' });
 
     expect(handled).toBe(true);
     expect(calls).toEqual([{ fn: 'start', hold: false }]);
-    expect(status.join(' ')).toContain('/dance on');
+    expect(status.join(' ')).toContain('/dancing');
   });
 
   it('holds the rainbow for /dance on and hints at /dance off', () => {
@@ -261,5 +304,28 @@ describe('tryHandleDanceCommand', () => {
 
     expect(handled).toBe(false);
     expect(calls).toEqual([]);
+  });
+
+  it('/dancing starts a perpetual flow', () => {
+    const handled = tryHandleDanceCommand(host, { name: 'dancing', args: '' });
+
+    expect(handled).toBe(true);
+    expect(calls).toEqual([{ fn: 'start', hold: true }]);
+    expect(status.join(' ')).toContain('/dancea off');
+  });
+
+  it('/dancea off freezes the animation but keeps the colors', () => {
+    const handled = tryHandleDanceCommand(host, { name: 'dancea', args: 'off' });
+
+    expect(handled).toBe(true);
+    expect(calls).toEqual([{ fn: 'freeze' }]);
+    expect(status.join(' ')).toContain('/dancea on');
+  });
+
+  it('/dancea on resumes the animation', () => {
+    const handled = tryHandleDanceCommand(host, { name: 'dancea', args: 'on' });
+
+    expect(handled).toBe(true);
+    expect(calls).toEqual([{ fn: 'resume' }]);
   });
 });

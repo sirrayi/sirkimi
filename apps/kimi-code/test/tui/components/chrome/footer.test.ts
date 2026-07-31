@@ -27,6 +27,8 @@ function setDanceView(colored: boolean, phase: number): void {
     phase,
     start: () => {},
     stop: () => {},
+    freeze: () => {},
+    resume: () => {},
     dispose: () => {},
   };
   setRainbowDance(dance);

@@ -77,6 +77,10 @@ export interface RainbowDanceView {
 
 export interface RainbowDanceController extends RainbowDanceView {
   start(opts: { hold: boolean }): void;
+  /** Freeze the animation in place; the rainbow colors stay on. */
+  freeze(): void;
+  /** Resume a frozen animation (or start a perpetual one if off). */
+  resume(): void;
   stop(): void;
   dispose(): void;
 }
@@ -197,6 +201,27 @@ export class RainbowDance implements RainbowDanceController {
     this.requestRender();
   }
 
+  /** Freeze the animation where it is; the static rainbow stays on. */
+  freeze(): void {
+    if (!this.isColored) return;
+    this.clearTimers();
+    this.requestRender();
+  }
+
+  /** Resume a frozen rainbow, or start a perpetual one from off. */
+  resume(): void {
+    if (!this.isColored) {
+      this.start({ hold: true });
+      return;
+    }
+    if (this.frameTimer !== null) return;
+    this.frameTimer = setInterval(() => {
+      this.currentPhase += 1;
+      this.requestRender();
+    }, DANCE_FRAME_MS);
+    this.requestRender();
+  }
+
   /**
    * Clear timers without repainting — for shutdown, where the UI is going
    * away and a final render would be wasted or write to a stopped terminal.
@@ -226,31 +251,56 @@ export class RainbowDance implements RainbowDanceController {
 }
 
 /**
- * Handle `/dance`:
- *   /dance       flow for a few seconds, then fade back to the default colors
- *   /dance on    flow forever — the animation runs until turned off
- *   /dance off   turn the rainbow off
+ * Handle the dance commands:
+ *   /dance        flow for a few seconds, then fade back to the default colors
+ *   /dance on     same as /dancing (back-compat)
+ *   /dance off    turn the rainbow off entirely
+ *   /dancing      flow forever — the animation runs until frozen or turned off
+ *   /dancea off   freeze the animation ('a' for animation); colors stay on
+ *   /dancea on    resume the animation
  *
  * Returns true when it claimed the input.
  */
 export function tryHandleDanceCommand(host: SlashCommandHost, parsed: ParsedSlashInput): boolean {
-  if (parsed.name !== 'dance') return false;
   if (currentDanceController === undefined) return false;
 
   // The status line dims the whole message, which buried the command in the
   // hint. Paint just the command in the brand color (bold) so it reads as a
   // command; chalk nesting resumes the dim run right after it.
   const cmd = (text: string): string => currentTheme.boldFg('primary', text);
-
+  const controller = currentDanceController;
   const sub = parsed.args.trim().toLowerCase();
-  if (sub === 'off') {
-    currentDanceController.stop();
-  } else if (sub === 'on') {
-    currentDanceController.start({ hold: true });
-    host.showStatus(`Dancing — use ${cmd('/dance off')} to turn it off.`);
-  } else {
-    currentDanceController.start({ hold: false });
-    host.showStatus(`Use ${cmd('/dance on')} to keep the rainbow on.`);
+
+  switch (parsed.name) {
+    case 'dance':
+      if (sub === 'off') {
+        controller.stop();
+      } else if (sub === 'on') {
+        controller.start({ hold: true });
+        host.showStatus(`Dancing — use ${cmd('/dance off')} to turn it off.`);
+      } else {
+        controller.start({ hold: false });
+        host.showStatus(`Use ${cmd('/dancing')} to keep the animation going.`);
+      }
+      return true;
+    case 'dancing':
+      controller.start({ hold: true });
+      host.showStatus(
+        `Dancing forever — ${cmd('/dancea off')} freezes the animation, ${cmd('/dance off')} turns it off.`,
+      );
+      return true;
+    case 'dancea':
+      if (sub === 'off') {
+        controller.freeze();
+        host.showStatus(
+          `Animation frozen — colors stay on. ${cmd('/dancea on')} resumes, ${cmd('/dance off')} turns it off.`,
+        );
+      } else {
+        controller.resume();
+        host.showStatus(`Animating — ${cmd('/dancea off')} freezes, ${cmd('/dance off')} turns it off.`);
+      }
+      return true;
+    default:
+      return false;
   }
-  return true;
 }
