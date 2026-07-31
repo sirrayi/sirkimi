@@ -9,6 +9,7 @@ import {
   localDayKey,
   recordSessionUsage,
   saveTokenUsageStore,
+  sessionUsageTotals,
   summarizeTokenUsage,
   tokenUsageWindowLabel,
   type TokenUsageStore,
@@ -115,6 +116,36 @@ describe('store persistence', () => {
     const store = { days: { '2026-07-31': { input: 5, output: 1 } }, sessions: {} };
     await saveTokenUsageStore(store, path);
     expect(await loadTokenUsageStore(path)).toEqual(store);
+  });
+});
+
+describe('sessionUsageTotals', () => {
+  it('prefers total when present', () => {
+    expect(
+      sessionUsageTotals({
+        total: { inputOther: 10, inputCacheRead: 2, inputCacheCreation: 3, output: 5 },
+      }),
+    ).toEqual({ input: 15, output: 5 });
+  });
+
+  it('falls back to summing byModel', () => {
+    expect(
+      sessionUsageTotals({
+        byModel: {
+          a: { inputOther: 10, inputCacheRead: 0, inputCacheCreation: 0, output: 1 },
+          b: { inputOther: 0, inputCacheRead: 4, inputCacheCreation: 6, output: 2 },
+        },
+      }),
+    ).toEqual({ input: 20, output: 3 });
+  });
+
+  it('falls back to currentTurn, then null', () => {
+    expect(
+      sessionUsageTotals({
+        currentTurn: { inputOther: 1, inputCacheRead: 0, inputCacheCreation: 0, output: 2 },
+      }),
+    ).toEqual({ input: 1, output: 2 });
+    expect(sessionUsageTotals({})).toBeNull();
   });
 });
 

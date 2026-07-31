@@ -39,6 +39,7 @@ import {
   loadTokenUsageStore,
   recordSessionUsage,
   saveTokenUsageStore,
+  sessionUsageTotals,
   summarizeTokenUsage,
   tokenUsageWindowLabel,
 } from './utils/token-usage';
@@ -1044,15 +1045,11 @@ export class KimiTUI {
     }
     try {
       const usage = await this.session.getUsage();
-      const total = usage.total;
-      if (total === undefined) {
+      const totals = sessionUsageTotals(usage);
+      if (totals === null) {
         this.state.footer.setTokenUsage(null);
         return;
       }
-      const totals = {
-        input: total.inputOther + total.inputCacheRead + total.inputCacheCreation,
-        output: total.output,
-      };
       const sessionId = this.state.appState.sessionId || 'unknown';
       const store = await loadTokenUsageStore();
       recordSessionUsage(store, sessionId, totals);

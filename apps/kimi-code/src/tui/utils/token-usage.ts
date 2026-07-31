@@ -160,3 +160,43 @@ export function tokenUsageWindowLabel(window: TokenUsageWindow): string {
       return '';
   }
 }
+
+interface SessionUsageLike {
+  readonly byModel?: Record<
+    string,
+    { readonly inputOther: number; readonly output: number; readonly inputCacheRead: number; readonly inputCacheCreation: number }
+  >;
+  readonly currentTurn?:
+    | { readonly inputOther: number; readonly output: number; readonly inputCacheRead: number; readonly inputCacheCreation: number }
+    | undefined;
+  readonly total?:
+    | { readonly inputOther: number; readonly output: number; readonly inputCacheRead: number; readonly inputCacheCreation: number }
+    | undefined;
+}
+
+/**
+ * Extract session-cumulative totals from the SDK's SessionUsage. `total` is
+ * the fast path but is not always populated; fall back to summing `byModel`
+ * (what the /usage panel does), then `currentTurn` as a last resort.
+ */
+export function sessionUsageTotals(usage: SessionUsageLike): TokenTotals | null {
+  const pick = (
+    t: { inputOther: number; output: number; inputCacheRead: number; inputCacheCreation: number },
+  ): TokenTotals => ({
+    input: t.inputOther + t.inputCacheRead + t.inputCacheCreation,
+    output: t.output,
+  });
+  if (usage.total !== undefined) return pick(usage.total);
+  const models = Object.values(usage.byModel ?? {});
+  if (models.length > 0) {
+    let input = 0;
+    let output = 0;
+    for (const m of models) {
+      input += m.inputOther + m.inputCacheRead + m.inputCacheCreation;
+      output += m.output;
+    }
+    return { input, output };
+  }
+  if (usage.currentTurn !== undefined) return pick(usage.currentTurn);
+  return null;
+}
