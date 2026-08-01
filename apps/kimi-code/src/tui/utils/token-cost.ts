@@ -127,7 +127,10 @@ export function estimateCostUsd(
   let any = false;
   for (const [alias, t] of Object.entries(byModel)) {
     const modelId = aliasToModel(alias);
-    const price = modelId !== undefined ? prices[modelId] : undefined;
+    // Managed aliases often use short ids (`k3`) while models.dev keys on the
+    // full name (`kimi-k3`) — try both.
+    const price =
+      modelId !== undefined ? (prices[modelId] ?? prices[`kimi-${modelId}`]) : undefined;
     if (price === undefined) continue;
     any = true;
     total +=

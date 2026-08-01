@@ -36,3 +36,17 @@ describe('estimateCostUsd', () => {
     expect(estimateCostUsd({}, () => 'kimi-k3', null)).toBeNull();
   });
 });
+
+describe('estimateCostUsd short model ids', () => {
+  it('falls back to the kimi- prefixed models.dev key', () => {
+    const cost = estimateCostUsd(
+      {
+        'kimi-code/k3': { inputOther: 0, inputCacheRead: 0, inputCacheCreation: 0, output: 1_000_000 },
+      },
+      () => 'k3',
+      prices,
+    );
+
+    expect(cost).toBeCloseTo(15, 5);
+  });
+});
