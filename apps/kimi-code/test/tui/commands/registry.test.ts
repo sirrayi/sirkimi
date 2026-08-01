@@ -149,6 +149,7 @@ describe('built-in slash command registry', () => {
     expect(new Set(names).size).toBe(names.length);
     expect(names).toEqual(
       expect.arrayContaining([
+        'activity',
         'add-dir',
         'compact',
         'btw',

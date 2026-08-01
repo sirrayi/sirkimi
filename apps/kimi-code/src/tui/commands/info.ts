@@ -21,7 +21,7 @@ import {
   withFeedbackVersionPrefix,
 } from '../constant/feedback';
 import { isManagedUsageProvider } from '../constant/kimi-tui';
-import { loadTokenUsageStore } from '../utils/token-usage';
+import { loadTokenUsageStore, sessionUsageCost } from '../utils/token-usage';
 import { submitFeedbackWithAttachments } from '../../feedback/feedback-attachments';
 import { formatErrorMessage } from '../utils/event-payload';
 import { openUrl } from '#/utils/open-url';
@@ -226,9 +226,10 @@ async function loadManagedUsageReport(host: SlashCommandHost): Promise<ManagedUs
  * breakdown. Supersedes /usage and /status, which remain as aliases.
  */
 export async function showDash(host: SlashCommandHost): Promise<void> {
-  const [runtimeStatus, managedUsage] = await Promise.all([
+  const [runtimeStatus, managedUsage, sessionUsage] = await Promise.all([
     loadRuntimeStatusReport(host),
     loadManagedUsageReport(host),
+    loadSessionUsageReport(host),
   ]);
   const usageStore = await loadTokenUsageStore();
   const appState = host.state.appState;
@@ -261,10 +262,76 @@ export async function showDash(host: SlashCommandHost): Promise<void> {
         new Date(),
         appState.activityWeeks ?? 10,
       );
-      return activity.length > 0 ? [...statusLines, '', ...activity] : statusLines;
+      const costLines = buildCostLines(
+        sessionUsage.usage !== undefined ? sessionUsageCost(sessionUsage.usage) : null,
+        usageStore.days,
+      );
+      return [
+        ...statusLines,
+        ...costLines,
+        ...(activity.length > 0 ? ['', ...activity] : []),
+      ];
     },
     'primary',
     ' Dashboard ',
+  );
+  host.state.transcriptContainer.addChild(panel);
+  host.state.ui.requestRender();
+}
+
+/** Cost row for /dash: session + today/7d/30d USD totals from the store. */
+function buildCostLines(
+  sessionCost: number | null,
+  days: Record<string, { input: number; output: number; cost?: number }>,
+): string[] {
+  const dayKey = (d: Date): string =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const costSince = (daysBack: number): number | null => {
+    let total = 0;
+    let seen = false;
+    for (let offset = 0; offset <= daysBack; offset++) {
+      const d = new Date();
+      d.setDate(d.getDate() - offset);
+      const c = days[dayKey(d)]?.cost;
+      if (c !== undefined) {
+        total += c;
+        seen = true;
+      }
+    }
+    return seen ? total : null;
+  };
+  const parts: string[] = [];
+  if (sessionCost !== null) parts.push(`session $${sessionCost.toFixed(2)}`);
+  const today = costSince(0);
+  if (today !== null) parts.push(`today $${today.toFixed(2)}`);
+  const week = costSince(6);
+  if (week !== null) parts.push(`7d $${week.toFixed(2)}`);
+  const month = costSince(29);
+  if (month !== null) parts.push(`30d $${month.toFixed(2)}`);
+  if (parts.length === 0) return [];
+  return ['', currentTheme.boldFg('primary', 'Cost'), `  ${currentTheme.fg('text', parts.join('   '))}`];
+}
+
+/** `/activity` — just the token activity grid and per-model breakdown. */
+export async function showActivity(host: SlashCommandHost): Promise<void> {
+  const usageStore = await loadTokenUsageStore();
+  const appState = host.state.appState;
+  const panel = new UsagePanelComponent(
+    () => {
+      const activity = buildActivitySection(
+        usageStore.days,
+        (t) => currentTheme.boldFg('primary', t),
+        (t) => currentTheme.fg('text', t),
+        (t) => currentTheme.fg('textDim', t),
+        new Date(),
+        appState.activityWeeks ?? 10,
+      );
+      return activity.length > 0
+        ? activity
+        : [currentTheme.fg('textDim', 'No token activity recorded yet.')];
+    },
+    'primary',
+    ' Activity ',
   );
   host.state.transcriptContainer.addChild(panel);
   host.state.ui.requestRender();

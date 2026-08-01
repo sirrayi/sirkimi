@@ -40,7 +40,7 @@ import {
   showSettingsSelector,
 } from './config';
 import { handleGoalCommand } from './goal';
-import { handleFeedbackCommand, showDash, showMcpServers, showStatusReport, showUsage } from './info';
+import { handleFeedbackCommand, showActivity, showDash, showMcpServers, showStatusReport, showUsage } from './info';
 import { handleAddDirCommand } from './add-dir';
 import { parseSlashInput } from './parse';
 import { handlePluginsCommand } from './plugins';
@@ -326,6 +326,9 @@ async function handleBuiltInSlashCommand(
       return;
     case 'dash':
       void showDash(host);
+      return;
+    case 'activity':
+      void showActivity(host);
       return;
     case 'feedback':
       await handleFeedbackCommand(host);

@@ -359,6 +359,13 @@ export const BUILTIN_SLASH_COMMANDS = [
     availability: 'always',
   },
   {
+    name: 'activity',
+    aliases: [],
+    description: 'Show the token activity grid and per-model breakdown',
+    priority: 55,
+    availability: 'always',
+  },
+  {
     name: 'tokens',
     aliases: [],
     description: 'Set the footer token usage window (session/day/week/month/forever/off)',
