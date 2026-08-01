@@ -83,6 +83,8 @@ export interface UsageReportOptions {
   readonly managedUsageError?: string;
   /** Daily token buckets for the activity grid (from the token-usage store). */
   readonly activityDays?: Record<string, ActivityDay>;
+  /** Activity grid width in weeks (1-52); default 10. */
+  readonly activityWeeks?: number;
 }
 
 export interface ManagedUsageReportLineOptions {
@@ -282,17 +284,21 @@ export function buildManagedUsageReportLines(options: ManagedUsageReportLineOpti
 export interface ActivityDay {
   readonly input: number;
   readonly output: number;
+  readonly byModel?: Record<string, { input: number; output: number }>;
 }
 
 /** GitHub-dark contribution greens: index 0 is the empty cell. */
 const ACTIVITY_SHADES = ['#3B4048', '#0E4429', '#006D32', '#26A641', '#39D353'] as const;
-const ACTIVITY_WEEKS = 10;
+const DEFAULT_ACTIVITY_WEEKS = 10;
+const MIN_ACTIVITY_WEEKS = 1;
+const MAX_ACTIVITY_WEEKS = 52;
 
 /**
  * GitHub-profile-style activity grid: one row per weekday, one column per
  * week, oldest on the left. Cell intensity is the day's total tokens
  * (in+out) relative to the peak day in the window. Ends with a legend, the
- * peak day, and recent-window totals.
+ * peak day, recent-window totals, and a per-model breakdown for the window.
+ * `weeks` is clamped to 1-52 (one year).
  */
 export function buildActivitySection(
   days: Record<string, ActivityDay>,
@@ -300,9 +306,14 @@ export function buildActivitySection(
   value: Colorize,
   muted: Colorize,
   now: Date = new Date(),
+  weeks: number = DEFAULT_ACTIVITY_WEEKS,
 ): string[] {
   const entries = Object.entries(days).filter(([, v]) => v.input + v.output > 0);
   if (entries.length === 0) return [];
+  const totalWeeks = Math.min(
+    MAX_ACTIVITY_WEEKS,
+    Math.max(MIN_ACTIVITY_WEEKS, Math.trunc(weeks) || DEFAULT_ACTIVITY_WEEKS),
+  );
 
   const dayKey = (d: Date): string => {
     const y = d.getFullYear();
@@ -323,7 +334,7 @@ export function buildActivitySection(
   // offsets into the past for every grid cell, by (weekday row, week col)
   const todayDow = now.getDay();
   const cell = (row: number, week: number): number => week * 7 + (todayDow - row);
-  const maxOffset = (ACTIVITY_WEEKS - 1) * 7 + todayDow;
+  const maxOffset = (totalWeeks - 1) * 7 + todayDow;
   let peak = 0;
   let peakKey = '';
   for (let offset = 0; offset <= maxOffset; offset++) {
@@ -339,10 +350,10 @@ export function buildActivitySection(
   };
   const paintCell = (t: number): string => chalk.hex(ACTIVITY_SHADES[level(t)]!)('■');
 
-  const lines: string[] = [accent(`Activity — last ${String(ACTIVITY_WEEKS)} weeks`)];
+  const lines: string[] = [accent(`Activity — last ${String(totalWeeks)} weeks`)];
   for (let row = 0; row < 7; row++) {
     let line = '  ';
-    for (let week = ACTIVITY_WEEKS - 1; week >= 0; week--) {
+    for (let week = totalWeeks - 1; week >= 0; week--) {
       const offset = cell(row, week);
       line += offset < 0 ? '  ' : paintCell(tokensAt(offset)) + ' ';
     }
@@ -375,6 +386,32 @@ export function buildActivitySection(
       `${muted('7d')}  ${value(formatTokenCount(week.input + week.output))}  ` +
       `${muted('30d')}  ${value(formatTokenCount(month.input + month.output))}`,
   );
+
+  // Per-model breakdown across the grid window.
+  const modelTotals = new Map<string, number>();
+  for (let offset = 0; offset <= maxOffset; offset++) {
+    const bucket = days[dayKey(offsetDate(offset))];
+    if (bucket?.byModel === undefined) continue;
+    for (const [model, m] of Object.entries(bucket.byModel)) {
+      modelTotals.set(model, (modelTotals.get(model) ?? 0) + m.input + m.output);
+    }
+  }
+  if (modelTotals.size > 0) {
+    const sorted = [...modelTotals.entries()].sort((a, b) => b[1] - a[1]);
+    const grand = sorted.reduce((sum, [, t]) => sum + t, 0);
+    lines.push('');
+    lines.push(accent('By model'));
+    const nameWidth = Math.max(...sorted.map(([name]) => name.length));
+    for (const [model, tokens] of sorted) {
+      const share = grand > 0 ? Math.round((tokens / grand) * 100) : 0;
+      const bar = renderProgressBar(grand > 0 ? tokens / grand : 0, 10);
+      lines.push(
+        `  ${muted(model.padEnd(nameWidth, ' '))}  ${currentTheme.fg('primary', bar)}  ${value(
+          formatTokenCount(tokens).padStart(7, ' '),
+        )}  ${muted(`${String(share)}%`)}`,
+      );
+    }
+  }
   return lines;
 }
 
@@ -422,7 +459,14 @@ export function buildUsageReportLines(options: UsageReportOptions): string[] {
   }
 
   if (options.activityDays !== undefined) {
-    const activitySection = buildActivitySection(options.activityDays, accent, value, muted);
+    const activitySection = buildActivitySection(
+      options.activityDays,
+      accent,
+      value,
+      muted,
+      new Date(),
+      options.activityWeeks ?? DEFAULT_ACTIVITY_WEEKS,
+    );
     if (activitySection.length > 0) {
       lines.push('');
       lines.push(...activitySection);

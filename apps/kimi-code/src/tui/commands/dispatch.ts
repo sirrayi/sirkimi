@@ -30,6 +30,7 @@ import {
   handleModelCommand,
   handlePlanCommand,
   handleSecondaryModelCommand,
+  handleSpinnersCommand,
   handleThemeCommand,
   handleTokensCommand,
   handleYoloCommand,
@@ -39,7 +40,7 @@ import {
   showSettingsSelector,
 } from './config';
 import { handleGoalCommand } from './goal';
-import { handleFeedbackCommand, showMcpServers, showStatusReport, showUsage } from './info';
+import { handleFeedbackCommand, showDash, showMcpServers, showStatusReport, showUsage } from './info';
 import { handleAddDirCommand } from './add-dir';
 import { parseSlashInput } from './parse';
 import { handlePluginsCommand } from './plugins';
@@ -323,11 +324,8 @@ async function handleBuiltInSlashCommand(
     case 'settings':
       showSettingsSelector(host);
       return;
-    case 'usage':
-      void showUsage(host);
-      return;
-    case 'status':
-      void showStatusReport(host);
+    case 'dash':
+      void showDash(host);
       return;
     case 'feedback':
       await handleFeedbackCommand(host);
@@ -340,6 +338,9 @@ async function handleBuiltInSlashCommand(
       return;
     case 'tokens':
       await handleTokensCommand(host, args);
+      return;
+    case 'spinners':
+      await handleSpinnersCommand(host, args);
       return;
     case 'yolo':
       await handleYoloCommand(host, args);

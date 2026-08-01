@@ -86,3 +86,34 @@ describe('handleTokensCommand', () => {
     expect(mocks.saveTuiConfig).not.toHaveBeenCalled();
   });
 });
+
+describe('handleTokensCommand cost toggle', () => {
+  beforeEach(() => {
+    mocks.saveTuiConfig.mockClear();
+  });
+
+  it('/tokens cost on enables and persists the cost display', async () => {
+    const host = makeHost();
+    await handleTokensCommand(host, 'cost on');
+
+    expect(mocks.saveTuiConfig).toHaveBeenCalledWith(expect.objectContaining({ cost: true }));
+    expect(host.setAppState).toHaveBeenCalledWith({ cost: true });
+    expect(host.refreshQuota).toHaveBeenCalledTimes(1);
+  });
+
+  it('/tokens cost off stores the default as absent', async () => {
+    const host = makeHost();
+    await handleTokensCommand(host, 'cost off');
+
+    expect(mocks.saveTuiConfig).toHaveBeenCalledWith(expect.objectContaining({ cost: undefined }));
+    expect(host.setAppState).toHaveBeenCalledWith({ cost: undefined });
+  });
+
+  it('rejects a missing toggle', async () => {
+    const host = makeHost();
+    await handleTokensCommand(host, 'cost');
+
+    expect(host.showError).toHaveBeenCalled();
+    expect(mocks.saveTuiConfig).not.toHaveBeenCalled();
+  });
+});

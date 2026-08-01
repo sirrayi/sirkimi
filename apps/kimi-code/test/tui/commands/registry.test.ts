@@ -36,8 +36,9 @@ describe('built-in slash command registry', () => {
     expect(findBuiltInSlashCommand('clear')?.name).toBe('new');
     expect(findBuiltInSlashCommand('btw')?.name).toBe('btw');
     expect(findBuiltInSlashCommand('mcp')?.name).toBe('mcp');
-    expect(findBuiltInSlashCommand('status')?.name).toBe('status');
-    expect(findBuiltInSlashCommand('usage')?.aliases).not.toContain('status');
+    expect(findBuiltInSlashCommand('status')?.name).toBe('dash');
+    expect(findBuiltInSlashCommand('usage')?.name).toBe('dash');
+    expect(findBuiltInSlashCommand('dash')?.aliases).toEqual(['usage', 'status']);
     expect(findBuiltInSlashCommand('unknown')).toBeUndefined();
   });
 
@@ -151,6 +152,7 @@ describe('built-in slash command registry', () => {
         'add-dir',
         'compact',
         'btw',
+        'dash',
         'editor',
         'exit',
         'export-debug-zip',
@@ -169,11 +171,11 @@ describe('built-in slash command registry', () => {
         'secondary_model',
         'sessions',
         'settings',
-        'status',
+        'spinners',
         'theme',
         'title',
+        'tokens',
         'undo',
-        'usage',
         'version',
         'yolo',
       ]),

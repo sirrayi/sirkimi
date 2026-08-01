@@ -22,6 +22,7 @@ import { SettingsSelectorComponent, type SettingsSelection } from '../components
 import { ThemeSelectorComponent } from '../components/dialogs/theme-selector';
 import { UpdatePreferenceSelectorComponent } from '../components/dialogs/update-preference-selector';
 import { DEFAULT_TUI_CONFIG, saveTuiConfig, type TuiConfig } from '../config';
+import { setCustomSpinnerWords, SPINNER_WORDS } from '../constant/spinner-words';
 import type { ThemeName } from '#/tui/theme';
 import { currentTheme, isBuiltInTheme, lightColors, loadCustomThemeMerged } from '#/tui/theme';
 import { NO_ACTIVE_SESSION_MESSAGE } from '../constant/kimi-tui';
@@ -62,6 +63,9 @@ function currentTuiConfig(host: SlashCommandHost): TuiConfig {
     statusLine: host.state.appState.statusLine,
     tokenUsage: host.state.appState.tokenUsage,
     dance: host.state.appState.dance,
+    spinnerWords: host.state.appState.spinnerWords,
+    cost: host.state.appState.cost,
+    activityWeeks: host.state.appState.activityWeeks,
   };
 }
 
@@ -926,6 +930,27 @@ type TokenUsageChoice = (typeof TOKEN_USAGE_CHOICES)[number];
 export async function handleTokensCommand(host: SlashCommandHost, args: string): Promise<void> {
   const arg = args.trim().toLowerCase();
   const current = host.state.appState.tokenUsage ?? 'session';
+
+  // `/tokens cost on|off` — toggle the USD cost next to the token readout.
+  if (arg.startsWith('cost')) {
+    const toggle = arg.split(/\s+/)[1];
+    if (toggle !== 'on' && toggle !== 'off') {
+      host.showError('Usage: /tokens cost on|off');
+      return;
+    }
+    const cost = toggle === 'on' ? true : undefined;
+    try {
+      await saveTuiConfig({ ...currentTuiConfig(host), cost });
+    } catch (error) {
+      host.showStatus(`Failed to save cost setting: ${formatErrorMessage(error)}`, 'error');
+      return;
+    }
+    host.setAppState({ cost });
+    host.refreshQuota();
+    host.showStatus(toggle === 'on' ? 'Cost display enabled.' : 'Cost display disabled.');
+    return;
+  }
+
   if (arg.length === 0) {
     host.showStatus(
       `Token usage window: ${current}. Options: ${TOKEN_USAGE_CHOICES.join(' | ')} (e.g. /tokens day).`,
@@ -954,4 +979,72 @@ export async function handleTokensCommand(host: SlashCommandHost, args: string):
   host.showStatus(
     arg === 'off' ? 'Token usage readout hidden.' : `Token usage window set to "${arg}".`,
   );
+}
+
+const SPINNER_WORD_PATTERN = /^[a-z]{2,20}$/;
+
+/**
+ * `/spinners add <word> | remove <word> | list` — manage custom spinner
+ * verbs. Customs merge with the built-in list and persist to tui.toml
+ * (`spinner_words`); they join the rotation immediately.
+ */
+export async function handleSpinnersCommand(host: SlashCommandHost, args: string): Promise<void> {
+  const customs = host.state.appState.spinnerWords ?? [];
+  const [sub = '', ...rest] = args.trim().toLowerCase().split(/\s+/);
+  const word = rest.join(' ');
+
+  if (sub === 'list' || sub === '') {
+    const customNote =
+      customs.length > 0 ? `custom (${String(customs.length)}): ${customs.join(', ')}` : 'no custom words yet';
+    host.showStatus(
+      `Spinner verbs: ${String(SPINNER_WORDS.length)} built-in; ${customNote}. ` +
+        'Add with /spinners add <word>.',
+    );
+    return;
+  }
+
+  if (sub !== 'add' && sub !== 'remove') {
+    host.showError(`Unknown /spinners action: ${sub}. Use add, remove, or list.`);
+    return;
+  }
+  if (!SPINNER_WORD_PATTERN.test(word)) {
+    host.showError(`Invalid word "${word}" — one lowercase word, 2-20 letters.`);
+    return;
+  }
+
+  if (sub === 'add') {
+    if (customs.includes(word) || (SPINNER_WORDS as readonly string[]).includes(word)) {
+      host.showStatus(`"${word}" is already in the spinner pool.`);
+      return;
+    }
+    const spinnerWords = [...customs, word];
+    await persistSpinnerWords(host, spinnerWords);
+    host.showStatus(`Added "${word}" to the spinner pool (${String(spinnerWords.length)} custom).`);
+    return;
+  }
+
+  if (!customs.includes(word)) {
+    host.showStatus(`"${word}" is not a custom spinner word.`);
+    return;
+  }
+  const spinnerWords = customs.filter((w) => w !== word);
+  await persistSpinnerWords(host, spinnerWords.length > 0 ? spinnerWords : undefined);
+  host.showStatus(`Removed "${word}" from the spinner pool.`);
+}
+
+async function persistSpinnerWords(
+  host: SlashCommandHost,
+  spinnerWords: string[] | undefined,
+): Promise<void> {
+  try {
+    await saveTuiConfig({
+      ...currentTuiConfig(host),
+      spinnerWords,
+    });
+  } catch (error) {
+    host.showStatus(`Failed to save spinner words: ${formatErrorMessage(error)}`, 'error');
+    return;
+  }
+  host.setAppState({ spinnerWords });
+  setCustomSpinnerWords(spinnerWords ?? []);
 }

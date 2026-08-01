@@ -4,7 +4,8 @@ import type { McpServerInfo, SessionStatus, SessionUsage } from '@moonshot-ai/ki
 
 import { buildMcpStatusReportLines } from '../components/messages/mcp-status-panel';
 import { buildStatusReportLines } from '../components/messages/status-panel';
-import { buildUsageReportLines, UsagePanelComponent, type ManagedUsageReport } from '../components/messages/usage-panel';
+import { buildActivitySection, buildUsageReportLines, UsagePanelComponent, type ManagedUsageReport } from '../components/messages/usage-panel';
+import { currentTheme } from '../theme';
 import {
   FEEDBACK_ISSUE_URL,
   FEEDBACK_STATUS_CANCELLED,
@@ -132,14 +133,14 @@ export async function showUsage(host: SlashCommandHost): Promise<void> {
     managedUsage: managedUsage?.usage,
     managedUsageError: managedUsage?.error,
     activityDays: usageStore.days,
+    activityWeeks: host.state.appState.activityWeeks,
   };
   const panel = new UsagePanelComponent(() => buildUsageReportLines(reportArgs), 'primary');
   host.state.transcriptContainer.addChild(panel);
   host.state.ui.requestRender();
 }
 
-export async function showStatusReport(host: SlashCommandHost): Promise<void> {
-  const [runtimeStatus, managedUsage] = await Promise.all([
+export async function showStatusReport(host: SlashCommandHost): Promise<void> {  const [runtimeStatus, managedUsage] = await Promise.all([
     loadRuntimeStatusReport(host),
     loadManagedUsageReport(host),
   ]);
@@ -217,4 +218,54 @@ async function loadManagedUsageReport(host: SlashCommandHost): Promise<ManagedUs
     return { error: res.message };
   }
   return { usage: { summary: res.summary, limits: res.limits, extraUsage: res.extraUsage } };
+}
+
+/**
+ * `/dash` — the unified dashboard: everything /status shows (identity,
+ * session, context, plan quotas) plus the token activity grid and per-model
+ * breakdown. Supersedes /usage and /status, which remain as aliases.
+ */
+export async function showDash(host: SlashCommandHost): Promise<void> {
+  const [runtimeStatus, managedUsage] = await Promise.all([
+    loadRuntimeStatusReport(host),
+    loadManagedUsageReport(host),
+  ]);
+  const usageStore = await loadTokenUsageStore();
+  const appState = host.state.appState;
+  const reportArgs = {
+    version: appState.version,
+    model: appState.model,
+    workDir: appState.workDir,
+    sessionId: appState.sessionId,
+    sessionTitle: appState.sessionTitle,
+    thinkingEffort: appState.thinkingEffort,
+    permissionMode: appState.permissionMode,
+    planMode: appState.planMode,
+    contextUsage: appState.contextUsage,
+    contextTokens: appState.contextTokens,
+    maxContextTokens: appState.maxContextTokens,
+    availableModels: appState.availableModels,
+    status: runtimeStatus.status,
+    statusError: runtimeStatus.error,
+    managedUsage: managedUsage?.usage,
+    managedUsageError: managedUsage?.error,
+  };
+  const panel = new UsagePanelComponent(
+    () => {
+      const statusLines = buildStatusReportLines(reportArgs);
+      const activity = buildActivitySection(
+        usageStore.days,
+        (t) => currentTheme.boldFg('primary', t),
+        (t) => currentTheme.fg('text', t),
+        (t) => currentTheme.fg('textDim', t),
+        new Date(),
+        appState.activityWeeks ?? 10,
+      );
+      return activity.length > 0 ? [...statusLines, '', ...activity] : statusLines;
+    },
+    'primary',
+    ' Dashboard ',
+  );
+  host.state.transcriptContainer.addChild(panel);
+  host.state.ui.requestRender();
 }

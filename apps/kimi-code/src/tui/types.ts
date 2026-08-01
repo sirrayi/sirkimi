@@ -59,6 +59,12 @@ export interface AppState {
   tokenUsage?: TokenUsageWindow;
   /** Rainbow dance at launch from tui.toml; kept so CLI saves don't drop it. */
   dance?: boolean;
+  /** User-added spinner verbs from tui.toml; kept so CLI saves don't drop them. */
+  spinnerWords?: string[];
+  /** Show USD cost in the footer token readout; kept so CLI saves don't drop it. */
+  cost?: boolean;
+  /** /usage activity grid width in weeks (1-52); absent means 10. */
+  activityWeeks?: number;
   availableModels: Record<string, ModelAlias>;
   availableProviders: Record<string, ProviderConfig>;
   sessionTitle: string | null;

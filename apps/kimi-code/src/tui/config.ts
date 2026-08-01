@@ -63,6 +63,12 @@ export const TuiConfigFileSchema = z.object({
   dance: z.boolean().optional(),
   /** Token usage readout window in the footer; default "session". */
   token_usage: z.enum(['session', 'day', 'week', 'month', 'forever', 'off']).optional(),
+  /** Extra whimsical verbs for the spinner, merged with the built-in list. */
+  spinner_words: z.array(z.string()).optional(),
+  /** true shows a USD cost next to the footer token readout. */
+  cost: z.boolean().optional(),
+  /** Weeks shown in the /usage activity grid (1-52); default 10. */
+  activity_weeks: z.number().int().min(1).max(52).optional(),
   editor: z
     .object({
       command: z.string().optional(),
@@ -89,6 +95,12 @@ export const TuiConfigSchema = z.object({
   dance: z.boolean().optional(),
   /** Token usage readout window; absent means "session". */
   tokenUsage: z.enum(['session', 'day', 'week', 'month', 'forever', 'off']).optional(),
+  /** User-added spinner verbs; absent means built-ins only. */
+  spinnerWords: z.array(z.string()).optional(),
+  /** Show USD cost in the footer token readout; absent means off. */
+  cost: z.boolean().optional(),
+  /** Weeks in the /usage activity grid; absent means 10. */
+  activityWeeks: z.number().int().min(1).max(52).optional(),
   editorCommand: z.string().nullable(),
   notifications: NotificationsConfigSchema,
   upgrade: UpgradePreferencesSchema,
@@ -177,8 +189,21 @@ export async function saveTuiConfig(
   await writeFile(filePath, renderTuiConfig(config), 'utf-8');
 }
 
-export function normalizeTuiConfig(
-  config: TuiConfigFileShape,
+/** Lowercase, trim, dedupe, and drop anything that isn't a single lowercase word. */
+export function normalizeSpinnerWords(raw: string[] | undefined): string[] | undefined {
+  if (raw === undefined) return undefined;
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const word of raw) {
+    const w = word.trim().toLowerCase();
+    if (!/^[a-z]{2,20}$/.test(w) || seen.has(w)) continue;
+    seen.add(w);
+    out.push(w);
+  }
+  return out.length > 0 ? out : undefined;
+}
+
+export function normalizeTuiConfig(  config: TuiConfigFileShape,
   warn: (message: string) => void = (message) => {
     // oxlint-disable-next-line no-console
     console.warn(message);
@@ -208,6 +233,14 @@ export function normalizeTuiConfig(
       config.token_usage === undefined || config.token_usage === 'session'
         ? undefined
         : config.token_usage,
+    spinnerWords: normalizeSpinnerWords(config.spinner_words),
+    // Only materialize the opt-in; undefined means off.
+    cost: config.cost === true ? true : undefined,
+    // Only materialize non-default ranges; undefined means 10 weeks.
+    activityWeeks:
+      config.activity_weeks === undefined || config.activity_weeks === 10
+        ? undefined
+        : config.activity_weeks,
     editorCommand: command === undefined || command.length === 0 ? null : command,
     notifications: {
       enabled: config.notifications?.enabled ?? DEFAULT_NOTIFICATIONS_CONFIG.enabled,
@@ -231,6 +264,10 @@ export function normalizeTuiConfig(
 }
 
 export function renderTuiConfig(config: TuiConfig): string {
+  const spinnerWordsLine =
+    config.spinnerWords !== undefined && config.spinnerWords.length > 0
+      ? `spinner_words = ${JSON.stringify(config.spinnerWords)}`
+      : `# spinner_words = ["vibing", "cooking"] # extra spinner verbs, merged with built-ins`;
   // An active status_line must round-trip: any preference save rewrites the
   // whole file, so the section is emitted live when set and left as a
   // commented-out guide when unset.
@@ -266,6 +303,9 @@ theme = "${escapeTomlBasicString(config.theme)}" # "auto" | "dark" | "light" | c
 disable_paste_burst = ${String(config.disablePasteBurst)} # true disables non-bracketed paste-burst fallback
 dance = ${String(config.dance === true)} # true starts the rainbow dance animation at launch
 token_usage = "${config.tokenUsage ?? 'session'}" # "session" | "day" | "week" | "month" | "forever" | "off"
+cost = ${String(config.cost === true)} # true shows USD cost next to the token readout
+activity_weeks = ${String(config.activityWeeks ?? 10)} # 1-52, weeks in the /usage activity grid
+${spinnerWordsLine}
 
 [editor]
 command = "${escapeTomlBasicString(config.editorCommand ?? '')}" # Empty uses $VISUAL / $EDITOR

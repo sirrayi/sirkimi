@@ -4043,10 +4043,11 @@ command = "vim"
 
     driver.handleUserInput('/status');
 
+    // /status is an alias of /dash — the dashboard carries the same fields.
     await vi.waitFor(() => {
       expect(getStatus).toHaveBeenCalledTimes(previousStatusCalls + 1);
       const output = stripSgr(driver.state.transcriptContainer.render(120).join('\n'));
-      expect(output).toContain(' Status ');
+      expect(output).toContain(' Dashboard ');
       expect(output).toContain('>_ Kimi Code');
       expect(output).toContain('Model');
       expect(output).toContain('thinking high');

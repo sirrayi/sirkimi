@@ -9,7 +9,9 @@ A customized fork of [Kimi Code CLI](https://github.com/MoonshotAI/kimi-code) (M
 - **Tips toggle** — `[status_line] tips = false` in `tui.toml` hides the rotating hints and collapses the footer to a single line
 - **Extended `/dance` easter egg** — `/dance` (one-off), `/dancing` (flows forever), `/dancea off|on` (freeze/resume the animation while keeping colors), `dance = true` in `tui.toml` to start it at launch
 - **Session-titled terminal tabs** — window title shows the session name plus a short session id
-- **Token usage readout** — bottom-left `in: … · out: …`, configurable window via `token_usage` in `tui.toml` (`session` | `day` | `week` | `month` | `forever` | `off`), updated after every prompt
+- **Token usage readout** — bottom-left `in: … · out: …`, configurable window via `token_usage` in `tui.toml` (`session` | `day` | `week` | `month` | `forever` | `off`), updated after every prompt; `/tokens` command for in-app switching, `/tokens cost on|off` for the optional USD cost display
+- **Custom spinner verbs** — `/spinners add|remove|list` manages your own words (persisted as `spinner_words` in `tui.toml`), merged with 60 built-ins; one verb per turn, shown next to the animated moon loader
+- **`/dash` dashboard** — unified status + plan quotas + GitHub-style activity grid (`activity_weeks = 1..52` in `tui.toml`, default 10) with per-model breakdown; `/usage` and `/status` are aliases
 - **Fork-safe identity** — `skimi --version` reports `sirkimi X (kimi-code Y)`; the upstream self-updater is disabled so it can never overwrite the fork with the stock build (update by re-running `install.sh`)
 
 **Versioning:** `MAJOR.SEMI.MINOR` — major for big changes, semi for feature-level updates, minor for fixes. First public release: **1.0.0**.

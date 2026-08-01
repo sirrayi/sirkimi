@@ -231,7 +231,8 @@ export class FooterComponent implements Component {
     weekly?: { used: number; limit: number; resetAt?: string };
   } | null = null;
   /** Token usage snapshot for the bottom-left readout; null hides it. */
-  private tokenUsage: { input: number; output: number; label: string } | null = null;
+  private tokenUsage: { input: number; output: number; label: string; cost?: number | null } | null =
+    null;
 
   constructor(state: AppState, onRefresh: () => void = () => {}) {
     this.state = state;
@@ -312,7 +313,9 @@ export class FooterComponent implements Component {
    * Token usage snapshot rendered at the bottom-left of line 2,
    * e.g. `in: 12.3k · out: 1.4k · today`. Pass null to hide.
    */
-  setTokenUsage(usage: { input: number; output: number; label: string } | null): void {
+  setTokenUsage(
+    usage: { input: number; output: number; label: string; cost?: number | null } | null,
+  ): void {
     this.tokenUsage = usage;
   }
 
@@ -360,9 +363,10 @@ export class FooterComponent implements Component {
 
     // Bottom-left readout: token usage for the configured window.
     const tu = this.tokenUsage;
+    const costText = tu?.cost != null ? ` · $${tu.cost.toFixed(2)}` : '';
     const tokenText =
       tu !== null
-        ? `in: ${formatTokenCount(tu.input)} · out: ${formatTokenCount(tu.output)}${tu.label.length > 0 ? ` · ${tu.label}` : ''}`
+        ? `in: ${formatTokenCount(tu.input)} · out: ${formatTokenCount(tu.output)}${costText}${tu.label.length > 0 ? ` · ${tu.label}` : ''}`
         : '';
 
     // With tips disabled, line 1's right slot is free — park the quota/context

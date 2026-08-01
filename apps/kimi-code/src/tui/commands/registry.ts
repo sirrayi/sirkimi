@@ -44,6 +44,17 @@ export function tokensArgumentCompletions(argumentPrefix: string): AutocompleteI
   return completeLeadingArg(TOKENS_ARG_COMPLETIONS, argumentPrefix);
 }
 
+const SPINNERS_ARG_COMPLETIONS: readonly ArgCompletionSpec[] = [
+  { value: 'add', description: 'Add a custom spinner verb' },
+  { value: 'remove', description: 'Remove a custom spinner verb' },
+  { value: 'list', description: 'Show built-in and custom verbs' },
+];
+
+/** Argument autocompletion for the `/spinners` command. */
+export function spinnersArgumentCompletions(argumentPrefix: string): AutocompleteItem[] | null {
+  return completeLeadingArg(SPINNERS_ARG_COMPLETIONS, argumentPrefix);
+}
+
 /** Argument autocompletion for the `/goal` command (subcommands). */
 export function goalArgumentCompletions(argumentPrefix: string): AutocompleteItem[] | null {
   const nextMatch = argumentPrefix.match(/^next\s+(\S*)$/i);
@@ -341,9 +352,9 @@ export const BUILTIN_SLASH_COMMANDS = [
     availability: 'always',
   },
   {
-    name: 'usage',
-    aliases: [],
-    description: 'Show session tokens + context window + plan quotas',
+    name: 'dash',
+    aliases: ['usage', 'status'],
+    description: 'Dashboard: status, plan quotas, token activity, per-model breakdown',
     priority: 60,
     availability: 'always',
   },
@@ -357,10 +368,12 @@ export const BUILTIN_SLASH_COMMANDS = [
     availability: 'always',
   },
   {
-    name: 'status',
+    name: 'spinners',
     aliases: [],
-    description: 'Show current session and runtime status',
-    priority: 60,
+    description: 'Manage custom spinner verbs (add/remove/list)',
+    priority: 55,
+    argumentHint: '[add <word>|remove <word>|list]',
+    completeArgs: spinnersArgumentCompletions,
     availability: 'always',
   },
   {

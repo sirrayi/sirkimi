@@ -35,11 +35,13 @@ import { quoteShellArg } from '#/utils/shell-quote';
 import { restoreTerminalModes } from '#/utils/terminal-restore';
 
 import { BannerProvider } from './banner/banner-provider';
-import { pickSpinnerWord, setTurnSpinnerWord } from './constant/spinner-words';
+import { pickSpinnerWord, setCustomSpinnerWords, setTurnSpinnerWord } from './constant/spinner-words';
 import {
   loadTokenUsageStore,
   recordSessionUsage,
   saveTokenUsageStore,
+  sessionUsageByModel,
+  sessionUsageCost,
   sessionUsageTotals,
   summarizeTokenUsage,
   tokenUsageWindowLabel,
@@ -250,6 +252,9 @@ function createInitialAppState(input: KimiTUIStartupInput): AppState {
     statusLine: input.tuiConfig.statusLine,
     tokenUsage: input.tuiConfig.tokenUsage,
     dance: input.tuiConfig.dance,
+    spinnerWords: input.tuiConfig.spinnerWords,
+    cost: input.tuiConfig.cost,
+    activityWeeks: input.tuiConfig.activityWeeks,
     availableModels: {},
     availableProviders: {},
     sessionTitle: null,
@@ -424,6 +429,8 @@ export class KimiTUI {
     if (startupInput.tuiConfig.dance === true) {
       getRainbowDanceController()?.start({ hold: true });
     }
+    // tui.toml `spinner_words`: merge user verbs into the spinner pool.
+    setCustomSpinnerWords(startupInput.tuiConfig.spinnerWords ?? []);
 
     this.reverseRpcDisposers.push(
       ...registerReverseRPCHandlers(this.approvalController, this.questionController, {
@@ -1050,14 +1057,16 @@ export class KimiTUI {
     }
     try {
       const store = await loadTokenUsageStore();
-      let totals = { input: 0, output: 0 };
+      let totals: { input: number; output: number; cost?: number } = { input: 0, output: 0 };
       if (this.session !== undefined) {
         const usage = await this.session.getUsage();
         const sessionTotals = sessionUsageTotals(usage);
         if (sessionTotals !== null) {
-          totals = sessionTotals;
+          const cost = sessionUsageCost(usage);
+          totals = cost !== null ? { ...sessionTotals, cost } : sessionTotals;
           const sessionId = this.state.appState.sessionId || 'unknown';
-          recordSessionUsage(store, sessionId, totals);
+          const byModel = sessionUsageByModel(usage) ?? undefined;
+          recordSessionUsage(store, sessionId, totals, new Date(), byModel);
           await saveTokenUsageStore(store);
         }
       }
@@ -1066,11 +1075,12 @@ export class KimiTUI {
         input: stats.input,
         output: stats.output,
         label,
+        cost: this.state.appState.cost === true ? (stats.cost ?? null) : null,
       });
       this.state.ui.requestRender();
     } catch {
       // Stay visible with zeros rather than vanishing on a transient error.
-      this.state.footer.setTokenUsage({ input: 0, output: 0, label });
+      this.state.footer.setTokenUsage({ input: 0, output: 0, label, cost: null });
     }
   }
 
