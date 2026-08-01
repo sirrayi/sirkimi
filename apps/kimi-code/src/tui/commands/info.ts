@@ -21,7 +21,8 @@ import {
   withFeedbackVersionPrefix,
 } from '../constant/feedback';
 import { isManagedUsageProvider } from '../constant/kimi-tui';
-import { loadTokenUsageStore, sessionUsageCost } from '../utils/token-usage';
+import { estimateCostUsd, getModelPrices } from '../utils/token-cost';
+import { loadTokenUsageStore } from '../utils/token-usage';
 import { submitFeedbackWithAttachments } from '../../feedback/feedback-attachments';
 import { formatErrorMessage } from '../utils/event-payload';
 import { openUrl } from '#/utils/open-url';
@@ -232,6 +233,7 @@ export async function showDash(host: SlashCommandHost): Promise<void> {
     loadSessionUsageReport(host),
   ]);
   const usageStore = await loadTokenUsageStore();
+  const prices = await getModelPrices();
   const appState = host.state.appState;
   const reportArgs = {
     version: appState.version,
@@ -263,7 +265,13 @@ export async function showDash(host: SlashCommandHost): Promise<void> {
         appState.activityWeeks ?? 10,
       );
       const costLines = buildCostLines(
-        sessionUsage.usage !== undefined ? sessionUsageCost(sessionUsage.usage) : null,
+        sessionUsage.usage !== undefined
+          ? estimateCostUsd(
+              sessionUsage.usage.byModel ?? {},
+              (alias) => appState.availableModels[alias]?.model,
+              prices,
+            )
+          : null,
         usageStore.days,
       );
       return [
@@ -301,13 +309,13 @@ function buildCostLines(
     return seen ? total : null;
   };
   const parts: string[] = [];
-  if (sessionCost !== null) parts.push(`session $${sessionCost.toFixed(2)}`);
+  if (sessionCost !== null) parts.push(`session ~$${sessionCost.toFixed(2)}`);
   const today = costSince(0);
-  if (today !== null) parts.push(`today $${today.toFixed(2)}`);
+  if (today !== null) parts.push(`today ~$${today.toFixed(2)}`);
   const week = costSince(6);
-  if (week !== null) parts.push(`7d $${week.toFixed(2)}`);
+  if (week !== null) parts.push(`7d ~$${week.toFixed(2)}`);
   const month = costSince(29);
-  if (month !== null) parts.push(`30d $${month.toFixed(2)}`);
+  if (month !== null) parts.push(`30d ~$${month.toFixed(2)}`);
   if (parts.length === 0) return [];
   return ['', currentTheme.boldFg('primary', 'Cost'), `  ${currentTheme.fg('text', parts.join('   '))}`];
 }

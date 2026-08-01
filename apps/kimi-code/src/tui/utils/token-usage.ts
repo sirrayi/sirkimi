@@ -203,15 +203,6 @@ export function tokenUsageWindowLabel(window: TokenUsageWindow): string {
   }
 }
 
-/**
- * Session cost in USD, read tolerantly: the wire protocol carries
- * `total_cost_usd` but the SDK type omits it. Null when absent.
- */
-export function sessionUsageCost(usage: unknown): number | null {  if (typeof usage !== 'object' || usage === null) return null;
-  const raw = (usage as Record<string, unknown>)['total_cost_usd'];
-  return typeof raw === 'number' && Number.isFinite(raw) && raw >= 0 ? raw : null;
-}
-
 interface SessionUsageLike {
   readonly byModel?: Record<
     string,

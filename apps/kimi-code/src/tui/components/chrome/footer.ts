@@ -363,7 +363,7 @@ export class FooterComponent implements Component {
 
     // Bottom-left readout: token usage for the configured window.
     const tu = this.tokenUsage;
-    const costText = tu?.cost != null ? ` · $${tu.cost.toFixed(2)}` : '';
+    const costText = tu?.cost != null ? ` · ~$${tu.cost.toFixed(2)}` : '';
     const tokenText =
       tu !== null
         ? `in: ${formatTokenCount(tu.input)} · out: ${formatTokenCount(tu.output)}${costText}${tu.label.length > 0 ? ` · ${tu.label}` : ''}`

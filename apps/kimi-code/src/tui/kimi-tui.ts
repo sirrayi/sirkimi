@@ -41,11 +41,11 @@ import {
   recordSessionUsage,
   saveTokenUsageStore,
   sessionUsageByModel,
-  sessionUsageCost,
   sessionUsageTotals,
   summarizeTokenUsage,
   tokenUsageWindowLabel,
 } from './utils/token-usage';
+import { estimateCostUsd, getModelPrices } from './utils/token-cost';
 import { readBannerDisplayState, writeBannerDisplayState } from './banner/state';
 import {
   BUILTIN_SLASH_COMMANDS,
@@ -1062,7 +1062,17 @@ export class KimiTUI {
         const usage = await this.session.getUsage();
         const sessionTotals = sessionUsageTotals(usage);
         if (sessionTotals !== null) {
-          const cost = sessionUsageCost(usage);
+          // No cost field on the wire — estimate from tokens x models.dev prices.
+          const prices = await getModelPrices();
+          const byModelBreakdown = (usage.byModel ?? {}) as Record<
+            string,
+            { inputOther: number; inputCacheRead: number; inputCacheCreation: number; output: number }
+          >;
+          const cost = estimateCostUsd(
+            byModelBreakdown,
+            (alias) => this.state.appState.availableModels[alias]?.model,
+            prices,
+          );
           totals = cost !== null ? { ...sessionTotals, cost } : sessionTotals;
           const sessionId = this.state.appState.sessionId || 'unknown';
           const byModel = sessionUsageByModel(usage) ?? undefined;
