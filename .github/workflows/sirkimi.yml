@@ -18,6 +18,21 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
+      - name: Verify fork base version matches the recorded sync point
+        # Catches the stale-banner class of bug (v1.2.0 shipped reporting
+        # kimi-code 0.31.1 after the 0.33.0 merge). Fails fast, before install.
+        shell: bash
+        run: |
+          sync=$(cut -d' ' -f1 .github/UPSTREAM_SYNC | tr -d '[:space:]')
+          base=$(sed -n "s/.*FORK_UPSTREAM_BASE_VERSION = '\([^']*\)'.*/\1/p" apps/kimi-code/src/constant/app.ts)
+          upstream=$(curl -fsSL "https://raw.githubusercontent.com/MoonshotAI/kimi-code/${sync}/apps/kimi-code/package.json" \
+            | python3 -c 'import json,sys; print(json.load(sys.stdin)["version"])')
+          echo "sync point: ${sync} | fork base: ${base} | upstream at sync: ${upstream}"
+          if [ -z "$base" ] || [ "$base" != "$upstream" ]; then
+            echo "::error::FORK_UPSTREAM_BASE_VERSION ('${base}') != upstream version at sync point ('${upstream}'). Update apps/kimi-code/src/constant/app.ts as part of the merge."
+            exit 1
+          fi
+
       - name: Setup pnpm
         uses: pnpm/action-setup@v6
 
