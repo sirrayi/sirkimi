@@ -10,7 +10,7 @@ export const PROCESS_NAME = 'kimi-code';
 // upstream self-update path (CDN/npm) must never run: it would replace the
 // fork with the stock build.
 export const FORK_NAME = 'sirkimi';
-export const FORK_UPSTREAM_BASE_VERSION = '0.31.1';
+export const FORK_UPSTREAM_BASE_VERSION = '0.33.0';
 export const FORK_INSTALL_URL =
   'https://raw.githubusercontent.com/sirrayi/sirkimi/main/install.sh';
 export const FORK_SELF_UPDATE_DISABLED = true;
