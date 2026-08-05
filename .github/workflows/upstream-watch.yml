@@ -3,6 +3,10 @@ name: upstream-watch
 # Weekly check (plus manual trigger) for new upstream commits. When
 # MoonshotAI/kimi-code main has moved past the recorded sync point, open (or
 # bump) an issue so the fork gets merged instead of silently aging.
+#
+# The sync point lives in THIS repo at .github/UPSTREAM_SYNC. It is updated
+# by whoever merges upstream (see the issue text), and initialized by this
+# workflow on its first run.
 
 on:
   schedule:
@@ -10,46 +14,64 @@ on:
   workflow_dispatch:
 
 permissions:
+  contents: write # to initialize .github/UPSTREAM_SYNC on first run
   issues: write
 
 jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      - name: Fetch upstream and local main
+      - name: Check out the fork (carries the sync point)
         uses: actions/checkout@v6
         with:
-          fetch-depth: 0
+          path: fork
+
+      - name: Check out upstream
+        uses: actions/checkout@v6
+        with:
           repository: MoonshotAI/kimi-code
           path: upstream
+          fetch-depth: 0
 
       - name: Compare against recorded sync point
         id: diff
         shell: bash
         run: |
-          SYNC_FILE=".github/UPSTREAM_SYNC"
+          SYNC_FILE="fork/.github/UPSTREAM_SYNC"
           recorded=""
-          if [ -f "$SYNC_FILE" ]; then recorded=$(cut -d' ' -f1 "$SYNC_FILE"); fi
+          if [ -f "$SYNC_FILE" ]; then recorded=$(cut -d' ' -f1 "$SYNC_FILE" | tr -d '[:space:]'); fi
           upstream_head=$(git -C upstream rev-parse origin/main)
           echo "recorded=$recorded"
           echo "upstream_head=$upstream_head"
-          if [ "$recorded" = "$upstream_head" ]; then
+
+          if [ -z "$recorded" ]; then
+            # First run: no baseline yet. Adopt upstream HEAD as the sync
+            # point (committed below) instead of false-alarming.
+            echo "behind=init" >> "$GITHUB_OUTPUT"
+            echo "head=$upstream_head" >> "$GITHUB_OUTPUT"
+          elif [ "$recorded" = "$upstream_head" ]; then
             echo "behind=no" >> "$GITHUB_OUTPUT"
           else
-            if [ -n "$recorded" ] && git -C upstream merge-base --is-ancestor "$recorded" "$upstream_head" 2>/dev/null; then
+            if git -C upstream merge-base --is-ancestor "$recorded" "$upstream_head" 2>/dev/null; then
               count=$(git -C upstream rev-list --count "$recorded".."$upstream_head")
             else
-              count="unknown"
+              count="unknown (recorded sync point is not an ancestor of upstream HEAD — was it rewritten?)"
             fi
             echo "behind=yes" >> "$GITHUB_OUTPUT"
             echo "count=$count" >> "$GITHUB_OUTPUT"
             echo "head=$upstream_head" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Record sync point
-        if: steps.diff.outputs.behind == 'no'
+      - name: Initialize sync point on first run
+        if: steps.diff.outputs.behind == 'init'
         shell: bash
-        run: git -C upstream rev-parse origin/main > .github/UPSTREAM_SYNC
+        run: |
+          echo "${{ steps.diff.outputs.head }}" > fork/.github/UPSTREAM_SYNC
+          git -C fork config user.name "github-actions[bot]"
+          git -C fork config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git -C fork add .github/UPSTREAM_SYNC
+          git -C fork commit -m "chore: initialize upstream sync point"
+          git -C fork push
 
       - name: Open an issue when upstream moved ahead
         if: steps.diff.outputs.behind == 'yes'
