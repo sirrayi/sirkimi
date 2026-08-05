@@ -80,10 +80,10 @@ jobs:
           COUNT: ${{ steps.diff.outputs.count }}
           HEAD: ${{ steps.diff.outputs.head }}
         run: |
-          existing=$(gh issue list --state open --label upstream-sync --json number --jq '.[0].number' || true)
+          existing=$(gh issue list -R ${{ github.repository }} --state open --label upstream-sync --json number --jq '.[0].number' || true)
           body="Upstream MoonshotAI/kimi-code main is ahead of the recorded sync point by ${COUNT} commit(s) (head: ${HEAD}). Merge upstream/main into sirkimi, run the full test suite, then update .github/UPSTREAM_SYNC."
           if [ -n "$existing" ]; then
-            gh issue comment "$existing" --body "$body"
+            gh issue comment -R ${{ github.repository }} "$existing" --body "$body"
           else
-            gh issue create --title "Upstream sync pending" --label upstream-sync --body "$body"
+            gh issue create -R ${{ github.repository }} --title "Upstream sync pending" --label upstream-sync --body "$body"
           fi
